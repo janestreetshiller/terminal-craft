@@ -158,6 +158,7 @@ not another active native checkout. Existing Git history was preserved.
 ## Public launch
 
 - [Final pre-publication verification](docs/public-launch-verification.md)
+- [Hosted CI timing regression and local reverification](docs/ci-timing-verification.md)
 - [Social content drafts and seven-day launch plan](docs/social-launch-plan.md)
 
 Social content is planned only; nothing is automatically posted or scheduled.

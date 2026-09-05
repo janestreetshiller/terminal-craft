@@ -1,0 +1,27 @@
+test_enhanced_press_release_terminal_session (terminal_session.TerminalSessionTests) ... FAIL
+test_legacy_terminal_session (terminal_session.TerminalSessionTests) ... FAIL
+
+======================================================================
+FAIL: test_enhanced_press_release_terminal_session (terminal_session.TerminalSessionTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<repository>/tests/test_terminal_session.py", line 39, in test_enhanced_press_release_terminal_session
+    self.session(True)
+  File "<repository>/tests/test_terminal_session.py", line 79, in session
+    self.assertEqual(after['blocks'][cell(23,21,20)],0)
+AssertionError: 2 != 0
+
+======================================================================
+FAIL: test_legacy_terminal_session (terminal_session.TerminalSessionTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<repository>/tests/test_terminal_session.py", line 36, in test_legacy_terminal_session
+    self.session(False)
+  File "<repository>/tests/test_terminal_session.py", line 79, in session
+    self.assertEqual(after['blocks'][cell(23,21,20)],0)
+AssertionError: 2 != 0
+
+----------------------------------------------------------------------
+Ran 2 tests in 3.674s
+
+FAILED (failures=2)

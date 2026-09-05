@@ -65,34 +65,66 @@ class TerminalSessionTests(unittest.TestCase):
                 if proc.poll() is None:
                     os.write(master,b''.join(f'\x1b[{code};{mod}:3u'.encode() for code,mod in codes))
                     pump(.03)
+            def wait_until(predicate, description, tick=None):
+                deadline=time.monotonic()+8
+                while time.monotonic()<deadline:
+                    self.assertIsNone(proc.poll(), f'Game exited while waiting for {description}')
+                    if tick: tick()
+                    pump(.03)
+                    if predicate(): return
+                self.fail(f'Timed out waiting for {description}')
+            def saved_until(predicate, description, repeat=None):
+                state=None
+                def read_state():
+                    nonlocal state
+                    state=snapshot(save)
+                    return predicate(state)
+                def request_save():
+                    if repeat: os.write(master,repeat)
+                    send(b'r',.03)
+                wait_until(read_state, description, request_save)
+                assert state is not None
+                return state
+            def hold_until_saved(code, predicate, description):
+                # Enhanced mode holds ONE press until observed progress, then releases.
+                # Legacy terminals need repeat presses to refresh their hold timeout.
+                if enhanced: os.write(master,f'\x1b[{code};1:1u'.encode())
+                try:
+                    return saved_until(predicate,description,None if enhanced else bytes([code]))
+                finally:
+                    if enhanced and proc.poll() is None:
+                        os.write(master,f'\x1b[{code};1:3u'.encode())
+                        pump(.03)
             try:
-                pump(.4)
-                self.assertIn(b'TERMINAL CRAFT',output)
+                wait_until(lambda: b'TERMINAL CRAFT' in output,'main menu')
                 send(b'\r',.3) # Continue fixture world
                 send(b'7')
-                send(b'e',.42)
-                send(b'h',.1) # pause mining before the next target
-                self.assertIn(b'CONTROLS AND RECIPES',output)
-                send(b'r')
-                after=snapshot(save)
+                saved_until(lambda s: s['tool']==2,'equipped pickaxe')
+                # Wall time is not simulation time on a loaded runner (dt is capped).
+                # Wait for the real block mutation, not a fixed 420 ms sleep.
+                hold_until_saved(ord('e'),lambda s: s['blocks'][cell(23,21,20)]==0,'first block mined')
+                output.clear()
+                send(b'h',.03) # pause mining before the next target
+                wait_until(lambda: b'CONTROLS AND RECIPES' in output,'controls overlay')
+                # Tool/block changes prove this is the updated save, not the fixture.
+                after=saved_until(lambda s: s['blocks'][cell(23,21,20)]==0,'mined save')
                 self.assertEqual(after['tool'],2)
                 self.assertEqual(after['blocks'][cell(23,21,20)],0)
                 self.assertEqual(after['blocks'][cell(24,21,20)],2)
                 self.assertEqual(after['inventory'][1],1)
                 send(b'h')
                 send(b'1q')
-                send(b'r')
-                placed=snapshot(save)
+                placed=saved_until(lambda s: s['blocks'][cell(23,21,20)]==1,'placed block')
                 self.assertEqual(placed['blocks'][cell(23,21,20)],1)
                 self.assertEqual(placed['inventory'][0],4)
-                send(b'a',.45)
-                send(b'r')
-                moved=snapshot(save)
+                moved=hold_until_saved(ord('a'),lambda s: s['pose'][:3]!=placed['pose'][:3],'player movement')
                 self.assertNotEqual(moved['pose'][:3],placed['pose'][:3])
-                send(b'\x1b',.15) # Escape pauses rather than quitting.
+                output.clear()
+                send(b'\x1b',.03) # Escape pauses rather than quitting.
+                wait_until(lambda: b'CONTROLS AND RECIPES' in output,'pause overlay')
                 self.assertIsNone(proc.poll())
                 send(b'\x11',.3) # Ctrl-Q saves and quits.
-                proc.wait(timeout=5)
+                proc.wait(timeout=8)
                 self.assertEqual(proc.returncode,0)
                 check=subprocess.run([str(ROOT/'target/release/terminal-craft'),'--check-save',str(save)],capture_output=True,text=True)
                 self.assertEqual(check.returncode,0,check.stderr)
