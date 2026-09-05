@@ -19,12 +19,48 @@ pub struct Lang {
 }
 
 pub const LANGS: [Lang; 6] = [
-    Lang { label: "KERNEL", surface: Block::Terra, amp: 9.0, tree: 0.010, gem: 0.002 },
-    Lang { label: "PYTHON PRAIRIE", surface: Block::Terra, amp: 4.0, tree: 0.018, gem: 0.002 },
-    Lang { label: "RUBY RAILS", surface: Block::Terra, amp: 8.0, tree: 0.020, gem: 0.050 },
-    Lang { label: "RUST BELT", surface: Block::Rust, amp: 11.0, tree: 0.005, gem: 0.010 },
-    Lang { label: "JAVA JUNGLE", surface: Block::Jungle, amp: 13.0, tree: 0.075, gem: 0.004 },
-    Lang { label: "TYPESCRIPT TOPANGA", surface: Block::TsSlate, amp: 9.0, tree: 0.012, gem: 0.004 },
+    Lang {
+        label: "KERNEL",
+        surface: Block::Terra,
+        amp: 9.0,
+        tree: 0.010,
+        gem: 0.002,
+    },
+    Lang {
+        label: "PYTHON PRAIRIE",
+        surface: Block::Terra,
+        amp: 4.0,
+        tree: 0.018,
+        gem: 0.002,
+    },
+    Lang {
+        label: "RUBY RAILS",
+        surface: Block::Terra,
+        amp: 8.0,
+        tree: 0.020,
+        gem: 0.050,
+    },
+    Lang {
+        label: "RUST BELT",
+        surface: Block::Rust,
+        amp: 11.0,
+        tree: 0.005,
+        gem: 0.010,
+    },
+    Lang {
+        label: "JAVA JUNGLE",
+        surface: Block::Jungle,
+        amp: 13.0,
+        tree: 0.075,
+        gem: 0.004,
+    },
+    Lang {
+        label: "TYPESCRIPT TOPANGA",
+        surface: Block::TsSlate,
+        amp: 9.0,
+        tree: 0.012,
+        gem: 0.004,
+    },
 ];
 
 /// Project pillars around origin (world-space, origin at map center).
@@ -35,6 +71,15 @@ const CLAIMS: [(f32, f32, usize); 5] = [
     (-24.0, -18.0, 4),
     (6.0, 30.0, 5),
 ];
+
+#[derive(Clone, Debug)]
+pub struct SaveState {
+    pub pose: [f32; 5],
+    pub tool: u8,
+    pub flying: bool,
+}
+
+pub type LoadedWorld = (World, [u16; 5], bool, u8, Option<SaveState>);
 
 pub struct World {
     pub seed: u32,
@@ -54,7 +99,10 @@ impl World {
                 let info = terrain(seed, wx, wz);
                 let h = info.h.clamp(1, SY - 4);
                 for y in 0..=h {
-                    let b = if y == h && info.gem > 0.0 && hash01(seed, x * 7 + 1, z * 7 - 3) < info.gem {
+                    let b = if y == h
+                        && info.gem > 0.0
+                        && hash01(seed, x * 7 + 1, z * 7 - 3) < info.gem
+                    {
                         Block::Ruby
                     } else if y >= h - 2 {
                         info.surface
@@ -153,34 +201,79 @@ impl World {
         terrain(self.seed, wx, wz).label
     }
 
-    pub fn save(&self, path: &Path, inv: &[u16; 5], creative: bool, slot: u8) -> io::Result<()> {
-        if let Some(dir) = path.parent() {
-            fs::create_dir_all(dir)?;
+    pub fn save(
+        &self,
+        path: &Path,
+        inv: &[u16; 5],
+        creative: bool,
+        slot: u8,
+        state: Option<&SaveState>,
+    ) -> io::Result<()> {
+        let dir = path
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        fs::create_dir_all(dir)?;
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let temporary = dir.join(format!(
+            ".terminal-craft-{}-{nonce}.tmp",
+            std::process::id()
+        ));
+        let result = (|| {
+            let mut f = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&temporary)?;
+            f.write_all(b"TCRF")?;
+            f.write_all(&2u16.to_le_bytes())?;
+            f.write_all(&self.seed.to_le_bytes())?;
+            for n in [SX as u16, SY as u16, SZ as u16] {
+                f.write_all(&n.to_le_bytes())?;
+            }
+            f.write_all(&[u8::from(creative), slot])?;
+            for n in inv {
+                f.write_all(&n.to_le_bytes())?;
+            }
+            f.write_all(&self.data)?;
+            f.write_all(&[u8::from(state.is_some())])?;
+            if let Some(s) = state {
+                for n in s.pose {
+                    f.write_all(&n.to_le_bytes())?;
+                }
+                f.write_all(&[s.tool, u8::from(s.flying)])?;
+            }
+            f.sync_all()?;
+            fs::rename(&temporary, path)?;
+            Ok(())
+        })();
+        if result.is_err() {
+            let _ = fs::remove_file(&temporary);
         }
-        let mut f = fs::File::create(path)?;
-        f.write_all(b"TCRF")?;
-        f.write_all(&1u16.to_le_bytes())?;
-        f.write_all(&self.seed.to_le_bytes())?;
-        f.write_all(&(SX as u16).to_le_bytes())?;
-        f.write_all(&(SY as u16).to_le_bytes())?;
-        f.write_all(&(SZ as u16).to_le_bytes())?;
-        f.write_all(&[if creative { 1 } else { 0 }, slot])?;
-        for n in inv {
-            f.write_all(&n.to_le_bytes())?;
-        }
-        f.write_all(&self.data)?;
-        Ok(())
+        result
     }
 
-    pub fn load(path: &Path) -> io::Result<(Self, [u16; 5], bool, u8)> {
+    pub fn load(path: &Path) -> io::Result<LoadedWorld> {
         let mut f = fs::File::open(path)?;
         let mut mag = [0u8; 4];
         f.read_exact(&mut mag)?;
         if &mag != b"TCRF" {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "not a TUICraft world"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "not a Terminal Craft world",
+            ));
         }
         let mut u16b = [0u8; 2];
         f.read_exact(&mut u16b)?;
+        let version = u16::from_le_bytes(u16b);
+        if !(1..=2).contains(&version) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "unsupported world version",
+            ));
+        }
         let mut seedb = [0u8; 4];
         f.read_exact(&mut seedb)?;
         let seed = u32::from_le_bytes(seedb);
@@ -191,7 +284,10 @@ impl World {
         f.read_exact(&mut u16b)?;
         let sz = u16::from_le_bytes(u16b) as i32;
         if sx != SX || sy != SY || sz != SZ {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "world size mismatch"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "world size mismatch",
+            ));
         }
         let mut flags = [0u8; 2];
         f.read_exact(&mut flags)?;
@@ -202,12 +298,56 @@ impl World {
         }
         let mut data = vec![0u8; (SX * SY * SZ) as usize];
         f.read_exact(&mut data)?;
-        Ok((
-            Self { seed, data },
-            inv,
-            flags[0] != 0,
-            flags[1],
-        ))
+        if data.iter().any(|&b| b > 12) || flags[0] > 1 || flags[1] > 5 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "invalid world data",
+            ));
+        }
+        let state = if version == 2 {
+            let mut present = [0u8; 1];
+            f.read_exact(&mut present)?;
+            match present[0] {
+                0 => None,
+                1 => {
+                    let mut pose = [0.0; 5];
+                    for n in &mut pose {
+                        let mut b = [0u8; 4];
+                        f.read_exact(&mut b)?;
+                        *n = f32::from_le_bytes(b);
+                    }
+                    let mut extra = [0u8; 2];
+                    f.read_exact(&mut extra)?;
+                    if pose.iter().any(|n| !n.is_finite())
+                        || !(1.0..SX as f32).contains(&pose[0])
+                        || !(1.0..SY as f32).contains(&pose[1])
+                        || !(1.0..SZ as f32).contains(&pose[2])
+                        || pose[4].abs() > 1.35
+                        || extra[0] > 4
+                        || extra[1] > 1
+                    {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "invalid player state",
+                        ));
+                    }
+                    Some(SaveState {
+                        pose,
+                        tool: extra[0],
+                        flying: extra[1] != 0,
+                    })
+                }
+                _ => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "invalid player marker",
+                    ))
+                }
+            }
+        } else {
+            None
+        };
+        Ok((Self { seed, data }, inv, flags[0] != 0, flags[1], state))
     }
 }
 
@@ -293,8 +433,7 @@ fn sstep(t: f32) -> f32 {
 }
 
 fn hash(seed: u32, x: i32, z: i32) -> u32 {
-    let mut h = seed
-        .wrapping_mul(374761393)
+    let mut h = seed.wrapping_mul(374761393)
         ^ (x as u32).wrapping_mul(668265263)
         ^ (z as u32).wrapping_mul(2147483647);
     h ^= h >> 13;
@@ -319,4 +458,78 @@ fn vnoise(seed: u32, x: f32, z: f32) -> f32 {
     let u = a + (b - a) * fx;
     let v = c + (d - c) * fx;
     u + (v - u) * fz
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    fn path() -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "terminal-craft-save-{}-{}.tcrf",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ))
+    }
+    #[test]
+    fn round_trip_preserves_world_inventory_and_player_state() {
+        let path = path();
+        let mut world = World::generate(123);
+        world.set(10, 20, 10, Block::Core);
+        let state = SaveState {
+            pose: [20.5, 22.0, 21.5, 0.8, -0.2],
+            tool: 2,
+            flying: true,
+        };
+        world
+            .save(&path, &[1, 2, 3, 4, 5], true, 4, Some(&state))
+            .unwrap();
+        let (loaded, inv, creative, slot, saved) = World::load(&path).unwrap();
+        let saved = saved.unwrap();
+        assert_eq!(loaded.data, world.data);
+        assert_eq!(inv, [1, 2, 3, 4, 5]);
+        assert!(creative);
+        assert_eq!(slot, 4);
+        assert_eq!(saved.pose, state.pose);
+        assert_eq!(saved.tool, 2);
+        assert!(saved.flying);
+        fs::remove_file(path).unwrap();
+    }
+    #[test]
+    fn legacy_v1_loads_without_player_metadata() {
+        let path = path();
+        let world = World::generate(42);
+        // Construct the original v1 format, not a v2 save disguised as v1.
+        let mut bytes = b"TCRF".to_vec();
+        bytes.extend(1u16.to_le_bytes());
+        bytes.extend(world.seed.to_le_bytes());
+        for n in [SX as u16, SY as u16, SZ as u16] {
+            bytes.extend(n.to_le_bytes());
+        }
+        bytes.extend([1, 2]);
+        for n in [4u16, 5, 6, 7, 8] {
+            bytes.extend(n.to_le_bytes());
+        }
+        bytes.extend(&world.data);
+        fs::write(&path, bytes).unwrap();
+        let (loaded, inv, creative, slot, state) = World::load(&path).unwrap();
+        assert_eq!(loaded.data, world.data);
+        assert_eq!(inv, [4, 5, 6, 7, 8]);
+        assert!(creative);
+        assert_eq!(slot, 2);
+        assert!(state.is_none());
+        fs::remove_file(path).unwrap();
+    }
+    #[test]
+    fn rejects_unknown_versions() {
+        let path = path();
+        let world = World::generate(42);
+        world.save(&path, &[0; 5], false, 0, None).unwrap();
+        let mut bytes = fs::read(&path).unwrap();
+        bytes[4] = 99;
+        fs::write(&path, bytes).unwrap();
+        assert!(World::load(&path).is_err());
+        fs::remove_file(path).unwrap();
+    }
 }

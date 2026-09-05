@@ -1,7 +1,10 @@
-use crate::block::{HOTBAR, Inventory};
+// Numeric camera/rectangle APIs intentionally use explicit coordinate arguments.
+#![allow(clippy::too_many_arguments)]
+use crate::block::{Inventory, HOTBAR};
 use crate::kitty::Metrics;
 use crate::kitty_gfx::Presenter;
 use crate::player::{raycast, Player};
+use crate::viewmodel::ViewModel;
 use crate::world::{World, SX, SZ};
 
 const FOG_NEAR: f32 = 18.0;
@@ -68,6 +71,9 @@ impl Frame {
         pixels: bool,
         deny: bool,
         metrics: Metrics,
+        view: &ViewModel,
+        mining: f32,
+        help: bool,
     ) {
         self.buf.clear();
         // home + hide cursor
@@ -75,26 +81,52 @@ impl Frame {
 
         let cols = self.cols as i32;
         let rows = self.rows as i32;
-        let view_rows = if pixels {
+        let view_rows = if pixels && !map {
             rows
         } else {
             (rows - HUD_ROWS).max(4)
         };
 
         if map {
+            crate::kitty_gfx::delete_all(&mut self.buf);
             self.draw_map(world, player, cols, view_rows);
-            self.draw_hud(world, player, inv, slot, creative, toast, fps, debug, deny, cols);
+            self.draw_hud(
+                world, player, inv, slot, creative, toast, fps, debug, deny, cols,
+            );
         } else if pixels {
             self.draw_world_pixels(
-                world, player, inv, slot, creative, toast, fps, debug, deny, metrics,
+                world, player, inv, slot, creative, toast, fps, debug, deny, metrics, view, mining,
+                help,
             );
         } else {
-            self.draw_world(world, player, cols, view_rows * 2);
-            self.draw_hud(world, player, inv, slot, creative, toast, fps, debug, deny, cols);
+            self.draw_world(world, player, cols, view_rows * 2, view, HOTBAR[slot]);
+            self.draw_hud(
+                world, player, inv, slot, creative, toast, fps, debug, deny, cols,
+            );
+        }
+        if help && (!pixels || map) {
+            use std::io::Write;
+            for (i, line) in HELP_LINES.iter().enumerate() {
+                let _ = write!(
+                    self.buf,
+                    "\x1b[{};2H\x1b[0;37;40m{:<width$}",
+                    i + 2,
+                    line,
+                    width = (cols - 3).max(1) as usize
+                );
+            }
         }
     }
 
-    fn draw_world(&mut self, world: &World, player: &Player, cols: i32, samples_y: i32) {
+    fn draw_world(
+        &mut self,
+        world: &World,
+        player: &Player,
+        cols: i32,
+        samples_y: i32,
+        view: &ViewModel,
+        block: crate::block::Block,
+    ) {
         let (ox, oy, oz) = player.eye();
         let (ldx, ldy, ldz) = player.look_dir();
         // camera basis
@@ -128,6 +160,14 @@ impl Frame {
             }
         }
 
+        let mut rgba: Vec<u8> = pixels
+            .iter()
+            .flat_map(|&(r, g, b)| [r, g, b, 255])
+            .collect();
+        view.draw(&mut rgba, cols, samples_y, block);
+        for (p, c) in pixels.iter_mut().zip(rgba.as_chunks::<4>().0.iter()) {
+            *p = (c[0], c[1], c[2]);
+        }
         // half-block pack: two samples → one cell
         let view_rows = samples_y / 2;
         for row in 0..view_rows {
@@ -157,6 +197,9 @@ impl Frame {
         debug: bool,
         deny: bool,
         metrics: Metrics,
+        view: &ViewModel,
+        mining: f32,
+        help: bool,
     ) {
         let (pw, ph) = metrics.view_px(0);
         let pw = pw as i32;
@@ -168,7 +211,25 @@ impl Frame {
             self.rgba.resize(need, 0);
         }
         fill_view(&mut self.rgba, pw, ph, world, ox, oy, oz, yaw, pitch, true);
-        overlay_hand(&mut self.rgba, pw, ph, HOTBAR[slot.min(5)]);
+        view.draw(&mut self.rgba, pw, ph, HOTBAR[slot.min(5)]);
+        let label = format!("{}   H HELP   I INVENTORY", view.tool.name());
+        blit_text_px(&mut self.rgba, pw, ph, 12, ph - 20, &label, DIM, 1.0);
+        if mining > 0.0 {
+            let w = (pw / 8).max(24);
+            let x = (pw - w) / 2;
+            let y = ph / 2 + 18;
+            fill_rect(&mut self.rgba, pw, ph, x, y, w, 6, PANEL);
+            fill_rect(
+                &mut self.rgba,
+                pw,
+                ph,
+                x,
+                y,
+                (w as f32 * mining.clamp(0.0, 1.0)) as i32,
+                6,
+                AMBER,
+            );
+        }
         overlay_hud(
             &mut self.rgba,
             pw,
@@ -183,8 +244,13 @@ impl Frame {
             debug,
             deny,
         );
+        if help {
+            overlay_help(&mut self.rgba, pw, ph, inv);
+        }
         let mut tmp = Vec::new();
-        let _ = self.presenter.present(&mut tmp, &self.rgba, pw as u32, ph as u32);
+        let _ = self
+            .presenter
+            .present(&mut tmp, &self.rgba, pw as u32, ph as u32);
         self.buf.extend_from_slice(&tmp);
     }
 
@@ -285,7 +351,11 @@ impl Frame {
                 if selected { AMBER } else { DIM },
                 fill,
             );
-            let count = if n > 99 { "99".to_string() } else { n.to_string() };
+            let count = if n > 99 {
+                "99".to_string()
+            } else {
+                n.to_string()
+            };
             blit_text(
                 &mut rows[2],
                 x + SLOT_W - 1 - count.len(),
@@ -424,7 +494,7 @@ pub(crate) fn fill_view(
         .map(|n| n.get())
         .unwrap_or(4)
         .clamp(1, 8);
-    let band = (ph as usize + threads - 1) / threads;
+    let band = (ph as usize).div_ceil(threads);
     std::thread::scope(|scope| {
         for (t, chunk) in rgba.chunks_mut(band * pw as usize * 4).enumerate() {
             let y0 = (t * band) as i32;
@@ -463,40 +533,65 @@ pub(crate) fn fill_view(
     });
 }
 
-fn overlay_hand(rgba: &mut [u8], pw: i32, ph: i32, block: crate::block::Block) {
-    let s = (ph as f32 * 0.20).clamp(48.0, 140.0) as i32;
-    let x = pw - s - (pw as f32 * 0.04) as i32;
-    let y = ph - s - (ph as f32 * 0.12) as i32;
-    let top = block.rgb(0);
-    let side = block.rgb(2);
-    let front = block.rgb(4);
-    let t = s / 3;
-    // isometric cube: top diamond, left + right faces
-    for i in 0..t {
-        let w = s - i * 2;
-        fill_rect(rgba, pw, ph, x + i, y + t - i, w.max(1), 2, top);
+const HELP_LINES: [&str; 12] = [
+    "TERMINAL CRAFT - CONTROLS AND RECIPES",
+    "WASD MOVE   ARROWS OR MOUSE LOOK   SPACE JUMP",
+    "HOLD LMB OR E/F TO MINE   RMB OR Q/TAB PLACE",
+    "0 HAND   7 PICKAXE   8 AXE   9 SHOVEL",
+    "1-6 BLOCKS   SCROLL OR BRACKETS SELECT",
+    "C CREATIVE   DOUBLE SPACE FLIGHT   Z DESCEND",
+    "M MAP   F3 DEBUG   R SAVE   ESC SAVE AND QUIT",
+    "CORE - 8 SLATE AND 1 GEM",
+    "CONDUIT - 3 SLATE AND 1 SAND",
+    "BEACON - 4 SAND AND 1 GEM",
+    "TOOLS ARE AVAILABLE IN BOTH GAME MODES",
+    "H / I / ESC CLOSE THIS PANEL",
+];
+
+fn overlay_help(rgba: &mut [u8], pw: i32, ph: i32, inv: &Inventory) {
+    let scale = ((pw as f32 / 350.0).min(ph as f32 / 270.0))
+        .floor()
+        .clamp(1.0, 3.0);
+    let w = (320.0 * scale) as i32;
+    let h = (220.0 * scale) as i32;
+    let x = (pw - w) / 2;
+    let y = (ph - h) / 2;
+    fill_rect(rgba, pw, ph, x, y, w, h, PANEL);
+    stroke_rect(rgba, pw, ph, x, y, w, h, 2, AMBER);
+    for (i, line) in HELP_LINES.iter().enumerate() {
+        blit_text_px(
+            rgba,
+            pw,
+            ph,
+            x + 8,
+            y + 10 + i as i32 * (14.0 * scale) as i32,
+            line,
+            if i == 0 { AMBER } else { TEXT },
+            scale,
+        );
     }
-    fill_rect(rgba, pw, ph, x, y + t, s / 2, s - t, side);
-    fill_rect(rgba, pw, ph, x + s / 2, y + t, s - s / 2, s - t, front);
-    // knuckle shade
-    fill_rect(
+    let resources = format!("TERRA {} SLATE {} WOOD {}", inv.terra, inv.slate, inv.wood);
+    let rare = format!("SAND {} GEM {}", inv.sand, inv.gem);
+    blit_text_px(
         rgba,
         pw,
         ph,
-        x + s / 6,
-        y + t + (s - t) / 2,
-        s / 3,
-        (s - t) / 3,
-        shade(side, 0.75),
+        x + 8,
+        y + h - (32.0 * scale) as i32,
+        &resources,
+        AMBER,
+        scale,
     );
-}
-
-fn shade(c: (u8, u8, u8), k: f32) -> (u8, u8, u8) {
-    (
-        (c.0 as f32 * k) as u8,
-        (c.1 as f32 * k) as u8,
-        (c.2 as f32 * k) as u8,
-    )
+    blit_text_px(
+        rgba,
+        pw,
+        ph,
+        x + 8,
+        y + h - (18.0 * scale) as i32,
+        &rare,
+        AMBER,
+        scale,
+    );
 }
 
 pub(crate) fn darken_bottom(rgba: &mut [u8], pw: i32, ph: i32, from: f32, amt: f32) {
@@ -573,7 +668,11 @@ fn overlay_hud(
             x += craft_gap - gap;
         }
         let selected = i == slot;
-        let lift = if selected { (5.0 * scale).round() as i32 } else { 0 };
+        let lift = if selected {
+            (5.0 * scale).round() as i32
+        } else {
+            0
+        };
         let y = y0 - lift;
         let fill = block.rgb(0);
         let frame = if selected && deny {
@@ -610,7 +709,11 @@ fn overlay_hud(
             gs,
         );
         let n = inv.held_count(*block);
-        let count = if n > 99 { "99".to_string() } else { n.to_string() };
+        let count = if n > 99 {
+            "99".to_string()
+        } else {
+            n.to_string()
+        };
         let cw = (count.len() as i32) * (5.0 * gs).round() as i32;
         blit_text_px(
             rgba,
@@ -625,7 +728,16 @@ fn overlay_hud(
     }
 }
 
-pub(crate) fn fill_rect(rgba: &mut [u8], pw: i32, ph: i32, x: i32, y: i32, w: i32, h: i32, c: (u8, u8, u8)) {
+pub(crate) fn fill_rect(
+    rgba: &mut [u8],
+    pw: i32,
+    ph: i32,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    c: (u8, u8, u8),
+) {
     for yy in y.max(0)..(y + h).min(ph) {
         for xx in x.max(0)..(x + w).min(pw) {
             put_px(rgba, pw, xx, yy, c);

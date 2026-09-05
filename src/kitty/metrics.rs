@@ -22,7 +22,7 @@ impl Metrics {
             return Err(io::Error::last_os_error());
         }
         if ws.ws_col == 0 || ws.ws_row == 0 {
-            return Err(io::Error::new(io::ErrorKind::Other, "empty winsize"));
+            return Err(io::Error::other("empty winsize"));
         }
         if ws.ws_xpixel > 0 && ws.ws_ypixel > 0 {
             return Ok(Self {

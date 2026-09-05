@@ -1,2 +1,6 @@
-/target
-**/*.rs.bk
+/target/
+/dist/
+__pycache__/
+.DS_Store
+*.tcrf
+*.tmp

@@ -200,15 +200,15 @@ pub fn base64(src: &[u8]) -> Vec<u8> {
 }
 
 pub fn base64_into(src: &[u8], out: &mut Vec<u8>) {
-    let mut chunks = src.chunks_exact(3);
-    for c in &mut chunks {
+    let (chunks, remainder) = src.as_chunks::<3>();
+    for c in chunks {
         let n = ((c[0] as u32) << 16) | ((c[1] as u32) << 8) | c[2] as u32;
         out.push(B64[(n >> 18) as usize & 63]);
         out.push(B64[(n >> 12) as usize & 63]);
         out.push(B64[(n >> 6) as usize & 63]);
         out.push(B64[n as usize & 63]);
     }
-    match chunks.remainder() {
+    match remainder {
         [a] => {
             let n = (*a as u32) << 16;
             out.push(B64[(n >> 18) as usize & 63]);

@@ -1,3 +1,5 @@
+// Numeric camera/rectangle APIs intentionally use explicit coordinate arguments.
+#![allow(clippy::too_many_arguments)]
 use crate::block::Block;
 use crate::world::{World, SX, SY, SZ};
 
@@ -86,10 +88,6 @@ impl Player {
             (0.0, 0.0)
         };
 
-        self.try_move(world, fx, 0.0, 0.0);
-        self.try_move(world, 0.0, 0.0, fz);
-        self.try_move(world, 0.0, 0.0, 0.0); // resolve Y already applied
-
         // Y collision after gravity
         if self.collides(world, self.x, self.y, self.z) {
             if self.vy < 0.0 {
@@ -112,6 +110,10 @@ impl Player {
             self.on_ground = self.collides(world, self.x, self.y - 0.08, self.z);
         }
 
+        // Resolve gravity first; otherwise every horizontal step collides with
+        // the temporary floor penetration and grounded movement stalls.
+        self.try_move(world, fx, 0.0, 0.0);
+        self.try_move(world, 0.0, 0.0, fz);
         self.x = self.x.clamp(1.2, SX as f32 - 1.2);
         self.z = self.z.clamp(1.2, SZ as f32 - 1.2);
         self.y = self.y.clamp(1.0, SY as f32 - 3.0);
@@ -133,7 +135,11 @@ impl Player {
         let h = 1.75;
         let xs = [(x - hw).floor() as i32, (x + hw).floor() as i32];
         let zs = [(z - hw).floor() as i32, (z + hw).floor() as i32];
-        let ys = [y.floor() as i32, (y + h * 0.5).floor() as i32, (y + h).floor() as i32];
+        let ys = [
+            y.floor() as i32,
+            (y + h * 0.5).floor() as i32,
+            (y + h).floor() as i32,
+        ];
         for yi in ys {
             for xi in xs {
                 for zi in zs {
@@ -160,7 +166,16 @@ pub struct Hit {
 }
 
 /// DDA raycast. Returns first solid hit within `reach`.
-pub fn raycast(world: &World, ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f32, reach: f32) -> Option<Hit> {
+pub fn raycast(
+    world: &World,
+    ox: f32,
+    oy: f32,
+    oz: f32,
+    dx: f32,
+    dy: f32,
+    dz: f32,
+    reach: f32,
+) -> Option<Hit> {
     let mut ix = ox.floor() as i32;
     let mut iy = oy.floor() as i32;
     let mut iz = oz.floor() as i32;
@@ -169,9 +184,21 @@ pub fn raycast(world: &World, ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f
     let step_y = if dy > 0.0 { 1 } else { -1 };
     let step_z = if dz > 0.0 { 1 } else { -1 };
 
-    let tdx = if dx.abs() < 1e-8 { f32::INFINITY } else { (1.0 / dx).abs() };
-    let tdy = if dy.abs() < 1e-8 { f32::INFINITY } else { (1.0 / dy).abs() };
-    let tdz = if dz.abs() < 1e-8 { f32::INFINITY } else { (1.0 / dz).abs() };
+    let tdx = if dx.abs() < 1e-8 {
+        f32::INFINITY
+    } else {
+        (1.0 / dx).abs()
+    };
+    let tdy = if dy.abs() < 1e-8 {
+        f32::INFINITY
+    } else {
+        (1.0 / dy).abs()
+    };
+    let tdz = if dz.abs() < 1e-8 {
+        f32::INFINITY
+    } else {
+        (1.0 / dz).abs()
+    };
 
     let mut tmax_x = if dx.abs() < 1e-8 {
         f32::INFINITY
@@ -240,4 +267,31 @@ pub fn raycast(world: &World, ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn walking_on_flat_ground_does_not_require_jumping() {
+        let mut world = World::generate(42);
+        for x in 15..30 {
+            for z in 15..30 {
+                for y in 14..25 {
+                    world.set(x, y, z, if y == 19 { Block::Slate } else { Block::Air });
+                }
+            }
+        }
+        let mut p = Player::spawn(&world);
+        p.x = 20.5;
+        p.y = 20.001;
+        p.z = 20.5;
+        p.yaw = 0.0;
+        p.on_ground = true;
+        for _ in 0..10 {
+            p.tick(&world, 0.0, 1.0, false, false, false, 0.033, false);
+        }
+        assert!(p.x > 21.0, "walking stalled at {}", p.x);
+        assert!((p.y - 20.0).abs() < 0.08);
+    }
 }

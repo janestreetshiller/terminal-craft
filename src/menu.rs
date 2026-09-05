@@ -1,3 +1,5 @@
+// Numeric camera/rectangle APIs intentionally use explicit coordinate arguments.
+#![allow(clippy::too_many_arguments)]
 //! Title: kitty-rendered world (slow orbit) + pixel wordmark + stacked buttons.
 //! Same hierarchy as OG Minecraft / the WebGL SANDBOX screen — not a cell dirt field.
 
@@ -8,15 +10,15 @@ use crate::render::{
 };
 use crate::world::World;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, MouseButton, MouseEventKind};
-use crossterm::terminal::{self, Clear, ClearType};
 use crossterm::queue;
+use crossterm::terminal::{self, Clear, ClearType};
 use std::io::{self, Write};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
 const SPLASH: [&str; 8] = [
     "python prairie!",
-    "also try zen!",
+    "native terminal pixels!",
     "mine terra, craft CORE",
     "ruby rails!",
     "a voxel sandbox",
@@ -84,14 +86,45 @@ pub fn run(out: &mut impl Write, save_path: &Path) -> io::Result<Option<Game>> {
             out.write_all(b"\x1b[?25l\x1b[H")?;
             out.write_all(&tmp)?;
             out.flush()?;
-            if let Some(g) = pump(save_path, has_save, &btns, &mut selected, metrics.cell_w, metrics.cell_h, cols, rows)? {
+            if let Some(g) = pump(
+                save_path,
+                has_save,
+                &btns,
+                &mut selected,
+                metrics.cell_w,
+                metrics.cell_h,
+                cols,
+                rows,
+            )? {
                 return Ok(g);
             }
         } else {
             // half-block fallback still uses the world, not a dirt field
             let frame_btns = layout_buttons(has_save, cols as i32 * 8, rows as i32 * 16);
-            paint_half(out, cols, rows, &world, ox, oy, oz, yaw, pitch, splash, selected, &frame_btns)?;
-            if let Some(g) = pump(save_path, has_save, &frame_btns, &mut selected, 8, 16, cols, rows)? {
+            paint_half(
+                out,
+                cols,
+                rows,
+                &world,
+                ox,
+                oy,
+                oz,
+                yaw,
+                pitch,
+                splash,
+                selected,
+                &frame_btns,
+            )?;
+            if let Some(g) = pump(
+                save_path,
+                has_save,
+                &frame_btns,
+                &mut selected,
+                8,
+                16,
+                cols,
+                rows,
+            )? {
                 return Ok(g);
             }
         }
@@ -106,10 +139,42 @@ fn layout_buttons(has_save: bool, pw: i32, ph: i32) -> [Btn; 4] {
     let x = (pw - bw) / 2;
     let y0 = (ph as f32 * 0.58) as i32;
     [
-        Btn { action: Action::Continue, label: "CONTINUE", enabled: has_save, x, y: y0, w: bw, h: bh },
-        Btn { action: Action::NewMap, label: "NEW MAP", enabled: true, x, y: y0 + bh + gap, w: bw, h: bh },
-        Btn { action: Action::Creative, label: "CREATIVE", enabled: true, x, y: y0 + (bh + gap) * 2, w: bw, h: bh },
-        Btn { action: Action::Quit, label: "QUIT GAME", enabled: true, x, y: y0 + (bh + gap) * 3, w: bw, h: bh },
+        Btn {
+            action: Action::Continue,
+            label: "CONTINUE",
+            enabled: has_save,
+            x,
+            y: y0,
+            w: bw,
+            h: bh,
+        },
+        Btn {
+            action: Action::NewMap,
+            label: "NEW MAP",
+            enabled: true,
+            x,
+            y: y0 + bh + gap,
+            w: bw,
+            h: bh,
+        },
+        Btn {
+            action: Action::Creative,
+            label: "CREATIVE",
+            enabled: true,
+            x,
+            y: y0 + (bh + gap) * 2,
+            w: bw,
+            h: bh,
+        },
+        Btn {
+            action: Action::Quit,
+            label: "QUIT GAME",
+            enabled: true,
+            x,
+            y: y0 + (bh + gap) * 3,
+            w: bw,
+            h: bh,
+        },
     ]
 }
 
@@ -123,11 +188,34 @@ fn overlay_chrome(
     elapsed: Duration,
 ) {
     let scale = (ph as f32 / 720.0).clamp(0.6, 1.5);
-    let title_s = (scale * 5.2).clamp(3.0, 8.0);
+    let title = "TERMINAL CRAFT";
+    let title_s = (scale * 5.2)
+        .min((pw - 32) as f32 / (title.len() as f32 * 6.0))
+        .floor()
+        .clamp(1.0, 8.0);
     let sub_s = (scale * 1.6).clamp(1.0, 3.0);
-    let tw = 7 * (6.0 * title_s) as i32;
-    blit_text_px(rgba, pw, ph, (pw - tw) / 2 + 3, (ph as f32 * 0.16) as i32 + 3, "SANDBOX", (40, 22, 10), title_s);
-    blit_text_px(rgba, pw, ph, (pw - tw) / 2, (ph as f32 * 0.16) as i32, "SANDBOX", AMBER, title_s);
+    let tw = title.len() as i32 * (6.0 * title_s) as i32;
+    blit_text_px(
+        rgba,
+        pw,
+        ph,
+        (pw - tw) / 2 + 3,
+        (ph as f32 * 0.16) as i32 + 3,
+        title,
+        (40, 22, 10),
+        title_s,
+    );
+    blit_text_px(
+        rgba,
+        pw,
+        ph,
+        (pw - tw) / 2,
+        (ph as f32 * 0.16) as i32,
+        title,
+        AMBER,
+        title_s,
+    );
+    let sub_s = sub_s.round();
     let mw = 15 * (6.0 * sub_s) as i32;
     blit_text_px(
         rgba,
@@ -135,11 +223,11 @@ fn overlay_chrome(
         ph,
         (pw - mw) / 2,
         (ph as f32 * 0.16) as i32 - (10.0 * sub_s) as i32,
-        "MULTIPLEXERVERSE",
+        "NATIVE TERMINAL",
         DIM,
         sub_s,
     );
-    let pulse = ((elapsed.as_millis() / 420) % 2) == 0;
+    let pulse = (elapsed.as_millis() / 420).is_multiple_of(2);
     let sw = splash.len() as i32 * (6.0 * sub_s) as i32;
     blit_text_px(
         rgba,
@@ -164,7 +252,17 @@ fn overlay_chrome(
         let frame = if hot { AMBER } else { (90, 64, 32) };
         let fg = if b.enabled { TEXT } else { DIM };
         fill_rect(rgba, pw, ph, b.x, b.y, b.w, b.h, bg);
-        stroke_rect(rgba, pw, ph, b.x, b.y, b.w, b.h, 2.max((scale * 2.0) as i32), frame);
+        stroke_rect(
+            rgba,
+            pw,
+            ph,
+            b.x,
+            b.y,
+            b.w,
+            b.h,
+            2.max((scale * 2.0) as i32),
+            frame,
+        );
         let ls = (scale * 2.0).clamp(1.0, 3.0);
         let lw = b.label.len() as i32 * (6.0 * ls) as i32;
         blit_text_px(
@@ -221,7 +319,29 @@ fn paint_half(
         }
         buf.extend_from_slice(b"\x1b[0m\r\n");
     }
-    let _ = (splash, selected);
+    use std::fmt::Write as _;
+    let mut chrome = String::new();
+    let center = (cols as usize).saturating_sub(28) / 2 + 1;
+    let _ = write!(
+        chrome,
+        "\x1b[3;{}H\x1b[1;33;40mTERMINAL CRAFT\x1b[5;{}H{}",
+        center, center, splash
+    );
+    for (i, label) in ["CONTINUE", "NEW MAP", "CREATIVE", "QUIT GAME"]
+        .iter()
+        .enumerate()
+    {
+        let _ = write!(
+            chrome,
+            "\x1b[{};{}H\x1b[{}m {} {} ",
+            10 + i * 2,
+            center,
+            if i == selected { "1;30;43" } else { "0;37;40" },
+            if i == selected { ">" } else { " " },
+            label
+        );
+    }
+    buf.extend_from_slice(chrome.as_bytes());
     out.write_all(&buf)?;
     out.flush()
 }
@@ -258,10 +378,16 @@ fn pump(
             }
             KeyCode::Enter | KeyCode::Char(' ') => activate(btns[*selected].action, save_path),
             KeyCode::Char('1') if has_save => Ok(Some(Some(Game::load(save_path)?))),
-            KeyCode::Char('1') | KeyCode::Char('2') => {
-                Ok(Some(Some(Game::new_map(seed_now(), false, save_path.to_path_buf()))))
-            }
-            KeyCode::Char('3') => Ok(Some(Some(Game::new_map(seed_now(), true, save_path.to_path_buf())))),
+            KeyCode::Char('1') | KeyCode::Char('2') => Ok(Some(Some(Game::new_map(
+                seed_now(),
+                false,
+                save_path.to_path_buf(),
+            )))),
+            KeyCode::Char('3') => Ok(Some(Some(Game::new_map(
+                seed_now(),
+                true,
+                save_path.to_path_buf(),
+            )))),
             _ => Ok(None),
         },
         Event::Mouse(m) => {
@@ -292,8 +418,16 @@ fn activate(action: Action, save_path: &Path) -> io::Result<Option<Option<Game>>
     Ok(match action {
         Action::Continue if save_path.exists() => Some(Some(Game::load(save_path)?)),
         Action::Continue => None,
-        Action::NewMap => Some(Some(Game::new_map(seed_now(), false, save_path.to_path_buf()))),
-        Action::Creative => Some(Some(Game::new_map(seed_now(), true, save_path.to_path_buf()))),
+        Action::NewMap => Some(Some(Game::new_map(
+            seed_now(),
+            false,
+            save_path.to_path_buf(),
+        ))),
+        Action::Creative => Some(Some(Game::new_map(
+            seed_now(),
+            true,
+            save_path.to_path_buf(),
+        ))),
         Action::Quit => Some(None),
     })
 }

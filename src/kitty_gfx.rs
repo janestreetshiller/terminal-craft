@@ -6,7 +6,9 @@ use crate::kitty::transport::Transport;
 use std::io::{self, Write};
 
 pub fn available() -> bool {
-    if std::env::var_os("TUICRAFT_ASCII").is_some() {
+    if std::env::var_os("TERMINAL_CRAFT_ASCII").is_some()
+        || std::env::var_os("TUICRAFT_ASCII").is_some()
+    {
         return false;
     }
     std::env::var_os("KITTY_WINDOW_ID").is_some()

@@ -1,0 +1,31 @@
+#!/bin/bash
+set -euo pipefail
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+SELF="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")" && pwd)"
+if [[ -x "$SELF/terminal-craft-bin" ]]; then
+  GAME="$SELF/terminal-craft-bin"
+  CONF="$SELF/../Resources/kitty-minigame.conf"
+else
+  ROOT="$(cd "$SELF/.." && pwd)"
+  GAME="$ROOT/target/release/terminal-craft"
+  CONF="$ROOT/kitty-minigame.conf"
+  if [[ ! -x "$GAME" ]]; then
+    cargo build --release --locked --manifest-path "$ROOT/Cargo.toml"
+  fi
+fi
+if [[ "${1:-}" == --here ]]; then shift; exec "$GAME" "$@"; fi
+if [[ $# -gt 0 ]]; then exec "$GAME" "$@"; fi
+KITTY="${TERMINAL_CRAFT_KITTY:-}"
+if [[ -z "$KITTY" ]]; then
+  for candidate in /Applications/kitty.app/Contents/MacOS/kitty "$HOME/Applications/k1tty.app/Contents/MacOS/kitty" /opt/homebrew/bin/kitty /usr/bin/kitty; do
+    if [[ -x "$candidate" ]]; then KITTY="$candidate"; break; fi
+  done
+fi
+if [[ ! -x "$KITTY" ]]; then
+  printf 'Terminal Craft needs kitty for its graphical window. Use --here for terminal fallback.\n' >&2
+  exit 1
+fi
+exec "$KITTY" --detach --title "Terminal Craft" --config "$CONF" \
+  --override remember_window_size=no --override confirm_os_window_close=0 \
+  --override macos_quit_when_last_window_closed=yes \
+  --override shell_integration=disabled --directory "$HOME" -e "$GAME"

@@ -1,10 +1,14 @@
-use crate::block::{HOTBAR, Inventory};
+use crate::block::{Inventory, HOTBAR};
 use crate::player::{raycast, Player};
 use crate::render::Frame;
+use crate::viewmodel::{Tool, ViewModel};
 use crate::world::World;
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, ModifierKeyCode, MouseButton, MouseEvent, MouseEventKind};
-use crossterm::terminal::{self, Clear, ClearType};
+use crossterm::event::{
+    self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, ModifierKeyCode, MouseButton,
+    MouseEvent, MouseEventKind,
+};
 use crossterm::queue;
+use crossterm::terminal::{self, Clear, ClearType};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -33,6 +37,11 @@ pub struct Game {
     cell_w: f32,
     cell_h: f32,
     pixel_mouse: bool,
+    view: ViewModel,
+    mine_progress: f32,
+    mine_target: Option<(i32, i32, i32)>,
+    mine_key: Hold,
+    help: bool,
 }
 
 struct Hold {
@@ -135,19 +144,37 @@ impl Game {
             cell_w: 8.0,
             cell_h: 16.0,
             pixel_mouse: false,
+            view: ViewModel::default(),
+            mine_progress: 0.0,
+            mine_target: None,
+            mine_key: Hold::new(),
+            help: false,
         }
     }
 
     pub fn load(path: &Path) -> io::Result<Self> {
-        let (world, inv, creative, slot) = World::load(path)?;
-        let player = Player::spawn(&world);
+        let (world, inv, creative, slot, state) = World::load(path)?;
+        let mut player = Player::spawn(&world);
+        let mut view = ViewModel::default();
+        let mut flying = creative;
+        if let Some(s) = state {
+            [player.x, player.y, player.z, player.yaw, player.pitch] = s.pose;
+            flying = creative && s.flying;
+            view.tool = match s.tool {
+                1 => Tool::Block,
+                2 => Tool::Pickaxe,
+                3 => Tool::Axe,
+                4 => Tool::Shovel,
+                _ => Tool::Hand,
+            };
+        }
         Ok(Self {
             world,
             player,
             inv: Inventory::unpack(inv),
             slot: (slot as usize).min(5),
             creative,
-            flying: creative,
+            flying,
             map: false,
             debug: false,
             toast: "CONTINUE".into(),
@@ -165,19 +192,32 @@ impl Game {
             cell_w: 8.0,
             cell_h: 16.0,
             pixel_mouse: false,
+            view,
+            mine_progress: 0.0,
+            mine_target: None,
+            mine_key: Hold::new(),
+            help: false,
         })
     }
 
-    fn save(&self) {
-        if let Err(e) = self.world.save(
+    fn save(&self) -> io::Result<()> {
+        self.world.save(
             &self.save_path,
             &self.inv.pack(),
             self.creative,
             self.slot as u8,
-        ) {
-            // keep playing; toast on next frame via eprintln is wrong in alt screen
-            let _ = e;
-        }
+            Some(&crate::world::SaveState {
+                pose: [
+                    self.player.x,
+                    self.player.y,
+                    self.player.z,
+                    self.player.yaw,
+                    self.player.pitch,
+                ],
+                tool: self.view.tool as u8,
+                flying: self.flying,
+            }),
+        )
     }
 
     fn toast(&mut self, s: &str) {
@@ -215,11 +255,17 @@ impl Game {
                     Event::Key(k) => {
                         self.keys.shift = k.modifiers.contains(KeyModifiers::SHIFT);
                         if self.handle_key(k) {
-                            self.save();
+                            self.save()?;
                             return Ok(());
                         }
                     }
                     Event::Mouse(m) => self.handle_mouse(m),
+                    Event::FocusLost => {
+                        self.keys = Keys::default();
+                        self.lmb = false;
+                        self.mine_key.set(false);
+                        self.mine_progress = 0.0;
+                    }
                     Event::Resize(c, r) => {
                         cols = c;
                         rows = r;
@@ -239,16 +285,21 @@ impl Game {
                 self.keys.jump = false;
             }
             self.player.flying = self.flying;
-            self.player.tick(
-                &self.world,
-                mx,
-                mz,
-                jump,
-                self.keys.sneak.held(rel) || self.keys.shift,
-                self.keys.space.held(rel),
-                dt,
-                self.creative && self.flying,
-            );
+            if !self.help && !self.map {
+                self.player.tick(
+                    &self.world,
+                    mx,
+                    mz,
+                    jump,
+                    self.keys.sneak.held(rel) || self.keys.shift,
+                    self.keys.space.held(rel),
+                    dt,
+                    self.creative && self.flying,
+                );
+            }
+            self.view
+                .advance(dt, !self.help && !self.map && (mx != 0.0 || mz != 0.0));
+            self.tick_mining(dt);
             self.term_cols = cols;
             self.term_rows = rows;
             self.cell_w = metrics.cell_w.max(1) as f32;
@@ -294,15 +345,28 @@ impl Game {
                 self.pixels,
                 deny,
                 metrics,
+                &self.view,
+                self.mine_progress,
+                self.help,
             );
             out.write_all(frame.as_bytes())?;
             out.flush()?;
+            // Bound CPU use without tying gameplay speed to frame rate.
+            let spent = now.elapsed();
+            if spent < Duration::from_millis(33) {
+                std::thread::sleep(Duration::from_millis(33) - spent);
+            }
         }
     }
 
     fn handle_key(&mut self, k: KeyEvent) -> bool {
         if k.modifiers.contains(KeyModifiers::CONTROL) && k.code == KeyCode::Char('c') {
             return true;
+        }
+        if k.code == KeyCode::Esc && (self.help || self.map) {
+            self.help = false;
+            self.map = false;
+            return false;
         }
         match k.code {
             KeyCode::Esc | KeyCode::Char('q') if k.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -326,7 +390,8 @@ impl Game {
             | KeyCode::Modifier(_) => self.set_hold(k.code, true),
             KeyCode::Char(' ') => {
                 let now = Instant::now();
-                if self.creative && now.duration_since(self.last_space) < Duration::from_millis(280) {
+                if self.creative && now.duration_since(self.last_space) < Duration::from_millis(280)
+                {
                     self.flying = !self.flying;
                     self.toast(if self.flying { "FLY" } else { "WALK" });
                 }
@@ -344,10 +409,15 @@ impl Game {
                     self.toast("SURVIVAL");
                 }
             }
+            KeyCode::Char('h') | KeyCode::Char('H') | KeyCode::Char('i') | KeyCode::Char('I') => {
+                self.help = !self.help;
+                self.lmb = false;
+                self.mine_key.set(false);
+            }
             KeyCode::Char('m') | KeyCode::Char('M') => self.map = !self.map,
             KeyCode::F(3) => self.debug = !self.debug,
             KeyCode::Char('e') | KeyCode::Char('E') | KeyCode::Char('f') | KeyCode::Char('F') => {
-                self.break_block();
+                self.mine_key.set(true);
             }
             KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Tab => {
                 self.place_block();
@@ -357,10 +427,26 @@ impl Game {
                 let n = d.to_digit(10).unwrap_or(0) as usize;
                 if (1..=6).contains(&n) {
                     self.slot = n - 1;
+                    self.view.tool = Tool::Block;
+                } else {
+                    self.view.tool = match n {
+                        7 => Tool::Pickaxe,
+                        8 => Tool::Axe,
+                        9 => Tool::Shovel,
+                        _ => Tool::Hand,
+                    };
                 }
+                self.mine_progress = 0.0;
+                self.toast(self.view.tool.name());
             }
-            KeyCode::Char('[') => self.slot = (self.slot + 5) % 6,
-            KeyCode::Char(']') => self.slot = (self.slot + 1) % 6,
+            KeyCode::Char('[') => {
+                self.slot = (self.slot + 5) % 6;
+                self.view.tool = Tool::Block;
+            }
+            KeyCode::Char(']') => {
+                self.slot = (self.slot + 1) % 6;
+                self.view.tool = Tool::Block;
+            }
             _ => {}
         }
         false
@@ -368,6 +454,9 @@ impl Game {
 
     fn set_hold(&mut self, code: KeyCode, down: bool) {
         match code {
+            KeyCode::Char('e') | KeyCode::Char('E') | KeyCode::Char('f') | KeyCode::Char('F') => {
+                self.mine_key.set(down)
+            }
             KeyCode::Char('w') | KeyCode::Char('W') => self.keys.w.set(down),
             KeyCode::Char('a') | KeyCode::Char('A') => self.keys.a.set(down),
             KeyCode::Char('s') | KeyCode::Char('S') => self.keys.s.set(down),
@@ -378,9 +467,7 @@ impl Game {
             KeyCode::Down => self.keys.down.set(down),
             KeyCode::Char(' ') => self.keys.space.set(down),
             KeyCode::Char('z') | KeyCode::Char('Z') => self.keys.sneak.set(down),
-            KeyCode::Modifier(m)
-                if matches!(m, ModifierKeyCode::LeftShift | ModifierKeyCode::RightShift) =>
-            {
+            KeyCode::Modifier(ModifierKeyCode::LeftShift | ModifierKeyCode::RightShift) => {
                 self.keys.shift = down;
             }
             _ => {}
@@ -392,6 +479,7 @@ impl Game {
         let y = m.row as i32;
         match m.kind {
             MouseEventKind::Down(MouseButton::Left) => {
+                self.view.swing();
                 self.lmb = true;
                 self.drag = 0;
                 self.mouse = (x, y);
@@ -400,9 +488,8 @@ impl Game {
             MouseEventKind::Down(MouseButton::Right) => self.place_block(),
             MouseEventKind::Up(MouseButton::Left) => {
                 self.lmb = false;
-                if self.drag < 4 {
-                    self.break_block();
-                }
+                self.mine_progress = 0.0;
+                self.mine_target = None;
             }
             MouseEventKind::Drag(_) | MouseEventKind::Moved => {
                 if x >= self.term_cols as i32 || y >= self.term_rows as i32 {
@@ -421,10 +508,13 @@ impl Game {
                     return;
                 }
                 if self.lmb {
-                    self.drag = self.drag.saturating_add(dx.unsigned_abs() + dy.unsigned_abs());
+                    self.drag = self
+                        .drag
+                        .saturating_add(dx.unsigned_abs() + dy.unsigned_abs());
                 }
                 // 1016 reports pixels. Cell reports are scaled to pixels first.
-                let sens = std::env::var("TUICRAFT_SENS")
+                let sens = std::env::var("TERMINAL_CRAFT_SENS")
+                    .or_else(|_| std::env::var("TUICRAFT_SENS"))
                     .ok()
                     .and_then(|s| s.parse().ok())
                     .unwrap_or(0.0024f32);
@@ -435,9 +525,47 @@ impl Game {
                 };
                 self.player.look(-px * sens, -py * sens);
             }
-            MouseEventKind::ScrollUp => self.slot = (self.slot + 5) % 6,
-            MouseEventKind::ScrollDown => self.slot = (self.slot + 1) % 6,
+            MouseEventKind::ScrollUp => {
+                self.slot = (self.slot + 5) % 6;
+                self.view.tool = Tool::Block;
+            }
+            MouseEventKind::ScrollDown => {
+                self.slot = (self.slot + 1) % 6;
+                self.view.tool = Tool::Block;
+            }
             _ => {}
+        }
+    }
+
+    fn tick_mining(&mut self, dt: f32) {
+        if self.help || self.map || !(self.lmb || self.mine_key.held(self.keys.saw_release)) {
+            self.mine_target = None;
+            self.mine_progress = 0.0;
+            return;
+        }
+        self.view.swing();
+        let (ox, oy, oz) = self.player.eye();
+        let (dx, dy, dz) = self.player.look_dir();
+        if let Some(hit) = raycast(&self.world, ox, oy, oz, dx, dy, dz, 6.0) {
+            let target = Some((hit.x, hit.y, hit.z));
+            if target != self.mine_target {
+                self.mine_progress = 0.0;
+                self.mine_target = target;
+            }
+            let duration = if self.creative {
+                0.12
+            } else {
+                self.view.tool.mine_time(hit.block)
+            };
+            self.mine_progress += dt / duration;
+            if self.mine_progress >= 1.0 {
+                self.break_block();
+                self.mine_progress = 0.0;
+                self.mine_target = None;
+            }
+        } else {
+            self.mine_progress = 0.0;
+            self.mine_target = None;
         }
     }
 
@@ -451,19 +579,21 @@ impl Game {
             } else {
                 self.toast(hit.block.name());
             }
-            self.world.set(hit.x, hit.y, hit.z, crate::block::Block::Air);
+            self.world
+                .set(hit.x, hit.y, hit.z, crate::block::Block::Air);
         }
     }
 
     fn place_block(&mut self) {
+        if self.help || self.map {
+            return;
+        }
+        self.view.swing();
         let (ox, oy, oz) = self.player.eye();
         let (dx, dy, dz) = self.player.look_dir();
         if let Some(hit) = raycast(&self.world, ox, oy, oz, dx, dy, dz, 6.0) {
             let b = HOTBAR[self.slot];
-            if !self.inv.try_pay(b, self.creative) {
-                self.toast("NEED RES");
-                return;
-            }
+            // Validate placement before spending resources.
             // don't place inside player
             let px = hit.px;
             let py = hit.py;
@@ -476,14 +606,28 @@ impl Game {
                 self.toast("BLOCKED");
                 return;
             }
+            if !(0..crate::world::SX).contains(&px)
+                || !(0..crate::world::SY).contains(&py)
+                || !(0..crate::world::SZ).contains(&pz)
+                || self.world.get(px, py, pz).is_solid()
+            {
+                self.toast("BLOCKED");
+                return;
+            }
+            if !self.inv.try_pay(b, self.creative) {
+                self.toast("NEED RES");
+                return;
+            }
             self.world.set(px, py, pz, b);
             self.toast(b.name());
         }
     }
 
     fn save_toast(&mut self) {
-        self.save();
-        self.toast("SAVED");
+        match self.save() {
+            Ok(()) => self.toast("SAVED"),
+            Err(_) => self.toast("SAVE FAILED"),
+        }
     }
 }
 
@@ -497,4 +641,113 @@ fn stdout_metrics(cols: u16, rows: u16) -> crate::kitty::Metrics {
         win_w: cols as u32 * 8,
         win_h: rows as u32 * 16,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::block::Block;
+    use crate::viewmodel::Tool;
+
+    fn fixture() -> Game {
+        let mut g = Game::new_map(
+            42,
+            false,
+            std::env::temp_dir().join("terminal-craft-unused.tcrf"),
+        );
+        g.player.x = 20.5;
+        g.player.y = 20.0;
+        g.player.z = 20.5;
+        g.player.yaw = 0.0;
+        g.player.pitch = 0.0;
+        g.world.set(21, 21, 20, Block::Slate);
+        g.inv.terra = 5;
+        g
+    }
+
+    #[test]
+    fn quick_click_still_swings_when_released_before_next_frame() {
+        let mut g = fixture();
+        let mut idle = vec![0; 320 * 200 * 4];
+        g.view.draw(&mut idle, 320, 200, Block::Terra);
+        for kind in [
+            MouseEventKind::Down(MouseButton::Left),
+            MouseEventKind::Up(MouseButton::Left),
+        ] {
+            g.handle_mouse(MouseEvent {
+                kind,
+                column: 10,
+                row: 10,
+                modifiers: KeyModifiers::NONE,
+            });
+        }
+        g.view.advance(0.1, false);
+        let mut active = vec![0; idle.len()];
+        g.view.draw(&mut active, 320, 200, Block::Terra);
+        assert!(active != idle, "quick clicks must animate the hand");
+    }
+
+    #[test]
+    fn blocked_placement_does_not_spend_inventory() {
+        let mut g = fixture();
+        g.place_block();
+        assert_eq!(g.inv.terra, 5);
+        assert_eq!(g.world.get(20, 21, 20), Block::Air);
+        assert_eq!(g.toast, "BLOCKED");
+    }
+
+    #[test]
+    fn tool_keys_and_block_slots_equip_the_viewmodel() {
+        let mut g = fixture();
+        for (key, tool) in [
+            ('7', Tool::Pickaxe),
+            ('8', Tool::Axe),
+            ('9', Tool::Shovel),
+            ('0', Tool::Hand),
+            ('2', Tool::Block),
+        ] {
+            g.handle_key(KeyEvent::new(KeyCode::Char(key), KeyModifiers::NONE));
+            assert_eq!(g.view.tool, tool);
+        }
+        assert_eq!(g.slot, 1);
+    }
+
+    #[test]
+    fn holding_mines_over_time_and_release_cancels() {
+        let mut g = fixture();
+        g.view.tool = Tool::Pickaxe;
+        g.lmb = true;
+        g.tick_mining(0.05);
+        assert_eq!(g.world.get(21, 21, 20), Block::Slate);
+        assert!(g.mine_progress > 0.0);
+        g.lmb = false;
+        g.tick_mining(0.05);
+        assert_eq!(g.mine_progress, 0.0);
+        g.lmb = true;
+        for _ in 0..10 {
+            g.tick_mining(0.05);
+        }
+        assert_eq!(g.world.get(21, 21, 20), Block::Air);
+        assert_eq!(g.inv.slate, 1);
+    }
+
+    #[test]
+    fn map_and_help_do_not_mine_in_background() {
+        let mut g = fixture();
+        g.lmb = true;
+        g.map = true;
+        for _ in 0..30 {
+            g.tick_mining(0.05);
+        }
+        assert_eq!(g.world.get(21, 21, 20), Block::Slate);
+        assert_eq!(g.mine_progress, 0.0);
+    }
+
+    #[test]
+    fn failed_save_is_reported_not_claimed_saved() {
+        let mut g = fixture();
+        g.save_path = std::env::temp_dir(); // a directory, never a valid world file
+        g.save_toast();
+        assert_eq!(g.toast, "SAVE FAILED");
+    }
 }

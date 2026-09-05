@@ -1,13 +1,14 @@
 [package]
-name = "tuicraft"
-version = "0.7.0"
+name = "terminal-craft"
+version = "0.8.0"
 edition = "2021"
-description = "Multiplexerverse voxel sandbox for the terminal"
+rust-version = "1.88"
+description = "Terminal Craft — native terminal voxel sandbox with hands and tools"
 license = "LicenseRef-All-Rights-Reserved"
 publish = false
 
 [[bin]]
-name = "tuicraft-game"
+name = "terminal-craft"
 path = "src/main.rs"
 
 [dependencies]
@@ -18,4 +19,4 @@ libc = "0.2"
 lto = true
 codegen-units = 1
 opt-level = 3
-strip = "symbols"
+strip = false
