@@ -1,0 +1,81 @@
+{
+  "timestamp": "2026-09-05T05:33:19.522160+00:00",
+  "results": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "1.log"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "log": "2.log"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "log": "3.log",
+      "rust_tests_passed": 40
+    },
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "log": "4.log"
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "exit_code": 0,
+      "log": "5.log",
+      "python_tests_passed": 6
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "6.log"
+    }
+  ],
+  "passed": true,
+  "release_sha256": "8c112f84af001c9cba0937ca2d6218df9165e98c434616c3b76a3b95f13e14ea",
+  "installed_sha256": "8c112f84af001c9cba0937ca2d6218df9165e98c434616c3b76a3b95f13e14ea",
+  "installed_matches_release": true,
+  "tested_source_commit": "23296a81119c82a55fb1b81f679e9d8e461779cb",
+  "platform": {
+    "os": "macOS 27.0",
+    "architecture": "arm64",
+    "rustc": "1.98.0",
+    "cargo": "1.98.0"
+  }
+}

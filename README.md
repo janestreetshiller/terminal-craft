@@ -5,7 +5,13 @@ pointer-locked mouse look.** Literal terminal rendering remains available as an
 option. Both hosts share one game engine, renderer, repository and save format.
 No browser, Node.js server, Chrome profile or relay is involved.
 
-**Canonical repository:** `/Users/main/Metal/terminal-craft`
+**Repository:** [janestreetshiller/terminal-craft](https://github.com/janestreetshiller/terminal-craft)
+
+![Terminal Craft voxel terrain and held block](docs/screenshots/native-polish-live.png)
+
+Public source repository maintained by **janestreetshiller**. The existing license
+is **all rights reserved**, not an open-source license; publication does not change
+those terms.
 
 **App:** `/Applications/Terminal Craft.app`
 
@@ -97,6 +103,8 @@ Homebrew SDL nor Kitty**. Initial dependencies may download. The project-local
 CMake policy setting keeps the vendored SDL build compatible with CMake 4.
 
 ```sh
+git clone https://github.com/janestreetshiller/terminal-craft.git
+cd terminal-craft
 cargo test --locked
 cargo fmt --check
 cargo clippy --all-targets --locked -- -D warnings
@@ -147,4 +155,11 @@ Rust snapshot had no Git metadata; commit `77e60e9` preserves the unmodified imp
 `~/Code/omarchy-craft/projects/TUICraft/current` is a retained historical snapshot,
 not another active native checkout. Existing Git history was preserved.
 
-This repository is local. It has not been pushed to a hosting service.
+## Public launch
+
+- [Final pre-publication verification](docs/public-launch-verification.md)
+- [Social content drafts and seven-day launch plan](docs/social-launch-plan.md)
+
+Social content is planned only; nothing is automatically posted or scheduled.
+The current supported installation workflow is a local macOS source build, not a
+signed/notarized binary download.

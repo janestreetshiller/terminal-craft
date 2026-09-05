@@ -1,0 +1,11 @@
+test_installed_app_and_cli_work_without_shell_configuration (test_install.InstallTests) ... ok
+test_release_identifies_as_terminal_craft (test_install.InstallTests) ... ok
+test_native_motion_and_packaged_runtime (test_native_window.NativeWindowTests) ... ok
+test_atomic_copy_preserves_old_open_inode (test_package_files.PackageFilesTests) ... ok
+test_enhanced_press_release_terminal_session (test_terminal_session.TerminalSessionTests) ... ok
+test_legacy_terminal_session (test_terminal_session.TerminalSessionTests) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 16.033s
+
+OK
