@@ -32,13 +32,20 @@ def snapshot(path):
             'pose':struct.unpack_from('<5f',data,29+SIZE), 'tool':data[49+SIZE]}
 
 class TerminalSessionTests(unittest.TestCase):
-    def test_real_keyboard_mining_placement_help_movement_and_save(self):
+    def test_legacy_terminal_session(self):
+        self.session(False)
+
+    def test_enhanced_press_release_terminal_session(self):
+        self.session(True)
+
+    def session(self, enhanced):
         with tempfile.TemporaryDirectory(prefix='terminal-craft-pty-') as td:
             save=Path(td)/'world.tcrf'; fixture(save)
             master,slave=pty.openpty()
             fcntl.ioctl(slave,termios.TIOCSWINSZ,struct.pack('HHHH',30,100,800,480))
             env=dict(os.environ,TERM='xterm-256color',TERMINAL_CRAFT_ASCII='1',TERMINAL_CRAFT_SAVE=str(save))
             env.pop('KITTY_WINDOW_ID',None)
+            if enhanced: env.update(TERM='xterm-kitty',KITTY_WINDOW_ID='1')
             proc=subprocess.Popen([str(ROOT/'target/release/terminal-craft')],stdin=slave,stdout=slave,stderr=slave,env=env,close_fds=True)
             os.close(slave)
             output=bytearray()
@@ -49,7 +56,15 @@ class TerminalSessionTests(unittest.TestCase):
                         try: output.extend(os.read(master,65536))
                         except OSError: break
                         if len(output)>2_000_000: del output[:-1_000_000]
-            def send(text,wait=.2): os.write(master,text); pump(wait)
+            def send(text,wait=.2):
+                if not enhanced:
+                    os.write(master,text); pump(wait); return
+                codes=[(113,5) if b==17 else (b,1) for b in text]
+                os.write(master,b''.join(f'\x1b[{code};{mod}:1u'.encode() for code,mod in codes))
+                pump(wait)
+                if proc.poll() is None:
+                    os.write(master,b''.join(f'\x1b[{code};{mod}:3u'.encode() for code,mod in codes))
+                    pump(.03)
             try:
                 pump(.4)
                 self.assertIn(b'TERMINAL CRAFT',output)
@@ -74,7 +89,9 @@ class TerminalSessionTests(unittest.TestCase):
                 send(b'r')
                 moved=snapshot(save)
                 self.assertNotEqual(moved['pose'][:3],placed['pose'][:3])
-                send(b'\x1b',.3)
+                send(b'\x1b',.15) # Escape pauses rather than quitting.
+                self.assertIsNone(proc.poll())
+                send(b'\x11',.3) # Ctrl-Q saves and quits.
                 proc.wait(timeout=5)
                 self.assertEqual(proc.returncode,0)
                 check=subprocess.run([str(ROOT/'target/release/terminal-craft'),'--check-save',str(save)],capture_output=True,text=True)

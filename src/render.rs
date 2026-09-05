@@ -95,7 +95,7 @@ impl Frame {
         } else if pixels {
             self.draw_world_pixels(
                 world, player, inv, slot, creative, toast, fps, debug, deny, metrics, view, mining,
-                help,
+                help, true,
             );
         } else {
             self.draw_world(world, player, cols, view_rows * 2, view, HOTBAR[slot]);
@@ -167,7 +167,7 @@ impl Frame {
         }
     }
 
-    fn draw_world_pixels(
+    pub(crate) fn draw_world_pixels(
         &mut self,
         world: &World,
         player: &Player,
@@ -182,6 +182,7 @@ impl Frame {
         view: &ViewModel,
         mining: f32,
         help: bool,
+        publish: bool,
     ) {
         let (pw, ph) = metrics.view_px(0);
         let pw = pw as i32;
@@ -241,6 +242,9 @@ impl Frame {
         );
         if help {
             overlay_help(&mut self.rgba, pw, ph, inv);
+        }
+        if !publish {
+            return;
         }
         let mut tmp = Vec::new();
         let _ = self
@@ -363,6 +367,10 @@ impl Frame {
         for row in &rows {
             emit_hud_row(&mut self.buf, row);
         }
+    }
+
+    pub(crate) fn rgba_mut(&mut self) -> &mut [u8] {
+        &mut self.rgba
     }
 
     pub fn as_bytes(&self) -> &[u8] {
@@ -608,19 +616,21 @@ fn raster_view(
     });
 }
 
-const HELP_LINES: [&str; 12] = [
+const HELP_LINES: [&str; 14] = [
     "TERMINAL CRAFT - CONTROLS AND RECIPES",
-    "WASD MOVE   ARROWS OR MOUSE LOOK   SPACE JUMP",
-    "HOLD LMB OR E/F TO MINE   RMB OR Q/TAB PLACE",
+    "WASD MOVE   MOUSE / ARROWS LOOK   SPACE JUMP",
+    "CTRL SPRINT   SHIFT / Z SNEAK OR DESCEND",
+    "HOLD LMB OR E/F MINE   RMB OR Q/TAB PLACE",
     "0 HAND   7 PICKAXE   8 AXE   9 SHOVEL",
     "1-6 BLOCKS   SCROLL OR BRACKETS SELECT",
-    "C CREATIVE   DOUBLE SPACE FLIGHT   Z DESCEND",
-    "M MAP   F3 DEBUG   R SAVE   ESC SAVE AND QUIT",
+    "C CREATIVE   G / DOUBLE SPACE TOGGLE FLIGHT",
+    "M MAP   F3 DEBUG   R SAVE   F11 FULLSCREEN",
+    "ESC PAUSE / RESUME   CTRL-Q SAVE AND QUIT",
     "CORE - 8 SLATE AND 1 GEM",
     "CONDUIT - 3 SLATE AND 1 SAND",
     "BEACON - 4 SAND AND 1 GEM",
     "TOOLS ARE AVAILABLE IN BOTH GAME MODES",
-    "H / I / ESC CLOSE THIS PANEL",
+    "H / I / ESC CLOSE - CLICK IN NATIVE WINDOW",
 ];
 
 fn overlay_help(rgba: &mut [u8], pw: i32, ph: i32, inv: &Inventory) {
@@ -628,7 +638,7 @@ fn overlay_help(rgba: &mut [u8], pw: i32, ph: i32, inv: &Inventory) {
         .floor()
         .clamp(1.0, 3.0);
     let w = (320.0 * scale) as i32;
-    let h = (220.0 * scale) as i32;
+    let h = ((HELP_LINES.len() as f32 * 14.0 + 56.0) * scale) as i32;
     let x = (pw - w) / 2;
     let y = (ph - h) / 2;
     fill_rect(rgba, pw, ph, x, y, w, h, PANEL);
@@ -872,6 +882,13 @@ fn put_px(rgba: &mut [u8], pw: i32, x: i32, y: i32, c: (u8, u8, u8)) {
         rgba[i + 2] = c.2;
         rgba[i + 3] = 255;
     }
+}
+
+pub(crate) fn text_width_px(text: &str, scale: f32) -> i32 {
+    let s = scale.round().max(1.0) as i32;
+    text.chars()
+        .map(|c| if glyph(c).is_some() { 6 * s } else { 4 * s })
+        .sum()
 }
 
 pub(crate) fn blit_text_px(

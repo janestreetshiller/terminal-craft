@@ -1,0 +1,4 @@
+# SDL2's vendored CMake project predates CMake 4 policy removal.
+# Project-local compatibility setting; do not modify the global toolchain.
+[env]
+CMAKE_POLICY_VERSION_MINIMUM = "3.5"

@@ -50,6 +50,9 @@ pub struct Game {
     mine_target: Option<(i32, i32, i32)>,
     mine_key: Hold,
     help: bool,
+    paused: bool,
+    focused: bool,
+    enhanced_keys: bool,
 }
 
 struct Hold {
@@ -92,6 +95,7 @@ struct Keys {
     jump: bool,
     saw_release: bool,
     shift: bool,
+    sprint: bool,
 }
 
 impl Default for Keys {
@@ -110,6 +114,7 @@ impl Default for Keys {
             jump: false,
             saw_release: false,
             shift: false,
+            sprint: false,
         }
     }
 }
@@ -157,6 +162,9 @@ impl Game {
             mine_target: None,
             mine_key: Hold::new(),
             help: false,
+            paused: false,
+            focused: true,
+            enhanced_keys: false,
         }
     }
 
@@ -205,10 +213,13 @@ impl Game {
             mine_target: None,
             mine_key: Hold::new(),
             help: false,
+            paused: false,
+            focused: true,
+            enhanced_keys: false,
         })
     }
 
-    fn save(&self) -> io::Result<()> {
+    pub(crate) fn save(&self) -> io::Result<()> {
         self.world.save(
             &self.save_path,
             &self.inv.pack(),
@@ -236,7 +247,8 @@ impl Game {
     fn step_player(&mut self, dt: f32, mx: f32, mz: f32, jump: bool) {
         self.player.flying = self.flying;
         let before = (self.player.x, self.player.z);
-        if !self.help && !self.map {
+        if !self.is_paused() {
+            self.player.sprinting = self.keys.sprint;
             self.player.tick(
                 &self.world,
                 mx,
@@ -255,6 +267,164 @@ impl Game {
         );
     }
 
+    pub(crate) fn update(&mut self, dt: f32) {
+        if self.is_paused() {
+            return;
+        }
+        let rel = self.keys.saw_release;
+        let mx = (self.keys.d.held(rel) as i32 - self.keys.a.held(rel) as i32) as f32;
+        let mz = (self.keys.w.held(rel) as i32 - self.keys.s.held(rel) as i32) as f32;
+        let jump = self.keys.jump;
+        if jump && (self.player.on_ground || self.flying) {
+            self.keys.jump = false;
+        }
+        self.step_player(dt, mx, mz, jump);
+        self.tick_mining(dt);
+        let look_s = 2.8 * dt;
+        if self.keys.left.held(rel) {
+            self.player.look(-look_s, 0.0);
+        }
+        if self.keys.right.held(rel) {
+            self.player.look(look_s, 0.0);
+        }
+        if self.keys.up.held(rel) {
+            self.player.look(0.0, look_s);
+        }
+        if self.keys.down.held(rel) {
+            self.player.look(0.0, -look_s);
+        }
+    }
+
+    pub(crate) fn snapshot(&self) -> [f32; 5] {
+        [
+            self.player.x,
+            self.player.y,
+            self.player.z,
+            self.player.yaw,
+            self.player.pitch,
+        ]
+    }
+    pub(crate) fn pause_menu(&self) -> bool {
+        self.paused && !self.help && !self.map
+    }
+    pub(crate) fn render_native<'a>(
+        &self,
+        frame: &'a mut Frame,
+        w: u32,
+        h: u32,
+        fps: u32,
+    ) -> &'a mut [u8] {
+        let metrics = crate::kitty::Metrics {
+            cols: w as u16,
+            rows: h as u16,
+            cell_w: 1,
+            cell_h: 1,
+            win_w: w,
+            win_h: h,
+        };
+        let toast = if Instant::now() < self.toast_until {
+            self.toast.as_str()
+        } else {
+            ""
+        };
+        frame.draw_world_pixels(
+            &self.world,
+            &self.player,
+            &self.inv,
+            self.slot,
+            self.creative,
+            toast,
+            fps,
+            self.debug,
+            toast == "NEED RES",
+            metrics,
+            &self.view,
+            self.mine_progress,
+            self.help,
+            false,
+        );
+        if self.map {
+            crate::native::paint_map(
+                frame.rgba_mut(),
+                w as i32,
+                h as i32,
+                &self.world,
+                &self.player,
+            );
+        }
+        frame.rgba_mut()
+    }
+
+    pub(crate) fn configure_input(&mut self, enhanced: bool, pixels: bool) {
+        self.enhanced_keys = enhanced;
+        self.pixel_mouse = pixels;
+        self.reset_controls();
+    }
+
+    fn reset_controls(&mut self) {
+        self.keys = Keys::default();
+        self.keys.saw_release = self.enhanced_keys;
+        self.mine_key.set(false);
+        self.lmb = false;
+        self.mouse_armed = false;
+        self.mine_progress = 0.0;
+        self.mine_target = None;
+    }
+
+    pub(crate) fn is_paused(&self) -> bool {
+        self.paused || self.help || self.map || !self.focused
+    }
+
+    pub(crate) fn relative_look(&mut self, dx: f32, dy: f32) {
+        if self.is_paused() {
+            return;
+        }
+        let sens = std::env::var("TERMINAL_CRAFT_SENS")
+            .or_else(|_| std::env::var("TUICRAFT_SENS"))
+            .ok()
+            .and_then(|v| v.parse::<f32>().ok())
+            .filter(|v| v.is_finite() && *v > 0.0)
+            .unwrap_or(0.0024);
+        self.player.look(
+            dx * sens.clamp(0.0001, 0.02),
+            -dy * sens.clamp(0.0001, 0.02),
+        );
+    }
+
+    pub(crate) fn input_event(&mut self, event: Event) -> bool {
+        match event {
+            Event::FocusLost => {
+                self.focused = false;
+                self.paused = true;
+                self.reset_controls();
+            }
+            Event::FocusGained => {
+                self.focused = true;
+                self.mouse_armed = false;
+            }
+            Event::Key(k) => {
+                self.keys.shift = k.modifiers.contains(KeyModifiers::SHIFT);
+                self.keys.sprint = k.modifiers.contains(KeyModifiers::CONTROL);
+                if k.kind == KeyEventKind::Release {
+                    self.keys.saw_release = true;
+                    self.set_hold(k.code, false);
+                } else if self.focused {
+                    if k.kind == KeyEventKind::Repeat {
+                        // Enhanced input is held by press/release; a late repeat must not re-arm it.
+                        if !self.keys.saw_release && !self.is_paused() {
+                            self.set_hold(k.code, true);
+                        }
+                    } else {
+                        return self.handle_key(k);
+                    }
+                }
+            }
+            Event::Mouse(m) => self.handle_mouse(m),
+            _ => {}
+        }
+        false
+    }
+
     pub fn run(&mut self, out: &mut impl Write) -> io::Result<()> {
         let (mut cols, mut rows) = terminal::size()?;
         let mut frame = Frame::new(cols, rows);
@@ -271,31 +441,6 @@ impl Game {
 
             while event::poll(Duration::from_millis(0))? {
                 match event::read()? {
-                    Event::Key(k) if k.kind == KeyEventKind::Release => {
-                        self.keys.saw_release = true;
-                        if !k.modifiers.contains(KeyModifiers::SHIFT) {
-                            self.keys.shift = false;
-                        }
-                        self.set_hold(k.code, false);
-                    }
-                    Event::Key(k) if k.kind == KeyEventKind::Repeat => {
-                        self.keys.shift = k.modifiers.contains(KeyModifiers::SHIFT);
-                        self.set_hold(k.code, true);
-                    }
-                    Event::Key(k) => {
-                        self.keys.shift = k.modifiers.contains(KeyModifiers::SHIFT);
-                        if self.handle_key(k) {
-                            self.save()?;
-                            return Ok(());
-                        }
-                    }
-                    Event::Mouse(m) => self.handle_mouse(m),
-                    Event::FocusLost => {
-                        self.keys = Keys::default();
-                        self.lmb = false;
-                        self.mine_key.set(false);
-                        self.mine_progress = 0.0;
-                    }
                     Event::Resize(c, r) => {
                         cols = c;
                         rows = r;
@@ -303,37 +448,20 @@ impl Game {
                         metrics = stdout_metrics(c, r);
                         queue!(out, Clear(ClearType::All))?;
                     }
-                    _ => {}
+                    other => {
+                        if self.input_event(other) {
+                            self.save()?;
+                            return Ok(());
+                        }
+                    }
                 }
             }
 
-            let rel = self.keys.saw_release;
-            let mx = (self.keys.d.held(rel) as i32 - self.keys.a.held(rel) as i32) as f32;
-            let mz = (self.keys.w.held(rel) as i32 - self.keys.s.held(rel) as i32) as f32;
-            let jump = self.keys.jump;
-            if jump && (self.player.on_ground || self.flying) {
-                self.keys.jump = false;
-            }
-            self.step_player(dt, mx, mz, jump);
-            self.tick_mining(dt);
             self.term_cols = cols;
             self.term_rows = rows;
             self.cell_w = metrics.cell_w.max(1) as f32;
             self.cell_h = metrics.cell_h.max(1) as f32;
-            let look_s = 2.8 * dt;
-            if self.keys.left.held(rel) {
-                self.player.look(-look_s, 0.0);
-            }
-            if self.keys.right.held(rel) {
-                self.player.look(look_s, 0.0);
-            }
-            if self.keys.up.held(rel) {
-                self.player.look(0.0, look_s);
-            }
-            if self.keys.down.held(rel) {
-                self.player.look(0.0, -look_s);
-            }
-
+            self.update(dt);
             frames += 1;
             if fps_t.elapsed() >= Duration::from_secs(1) {
                 fps = frames;
@@ -363,7 +491,7 @@ impl Game {
                 metrics,
                 &self.view,
                 self.mine_progress,
-                self.help,
+                self.help || self.paused,
             );
             out.write_all(frame.as_bytes())?;
             out.flush()?;
@@ -380,16 +508,40 @@ impl Game {
         if k.modifiers.contains(KeyModifiers::CONTROL) && k.code == KeyCode::Char('c') {
             return true;
         }
-        if k.code == KeyCode::Esc && (self.help || self.map) {
-            self.help = false;
-            self.map = false;
+        if k.modifiers.contains(KeyModifiers::CONTROL) && k.code == KeyCode::Char('q') {
+            return true;
+        }
+        if k.code == KeyCode::Esc {
+            if self.help || self.map {
+                self.help = false;
+                self.map = false;
+                self.paused = false;
+            } else {
+                self.paused = !self.paused;
+            }
+            self.reset_controls();
+            return false;
+        }
+        if self.paused && k.code == KeyCode::Enter {
+            self.paused = false;
+            self.reset_controls();
+            return false;
+        }
+        if self.paused && matches!(k.code, KeyCode::Char('q' | 'Q')) {
+            return true;
+        }
+        if self.is_paused()
+            && !matches!(
+                k.code,
+                KeyCode::Char('h' | 'H' | 'i' | 'I' | 'm' | 'M' | 'r' | 'R') | KeyCode::F(3)
+            )
+        {
             return false;
         }
         match k.code {
             KeyCode::Esc | KeyCode::Char('q') if k.modifiers.contains(KeyModifiers::CONTROL) => {
                 return true;
             }
-            KeyCode::Esc => return true,
             KeyCode::Char('w')
             | KeyCode::Char('W')
             | KeyCode::Char('a')
@@ -428,16 +580,26 @@ impl Game {
             }
             KeyCode::Char('h') | KeyCode::Char('H') | KeyCode::Char('i') | KeyCode::Char('I') => {
                 self.help = !self.help;
-                self.lmb = false;
-                self.mine_key.set(false);
+                self.paused = false;
+                self.map = false;
+                self.reset_controls();
             }
-            KeyCode::Char('m') | KeyCode::Char('M') => self.map = !self.map,
+            KeyCode::Char('m') | KeyCode::Char('M') => {
+                self.map = !self.map;
+                self.paused = false;
+                self.help = false;
+                self.reset_controls();
+            }
             KeyCode::F(3) => self.debug = !self.debug,
             KeyCode::Char('e') | KeyCode::Char('E') | KeyCode::Char('f') | KeyCode::Char('F') => {
                 self.mine_key.set(true);
             }
             KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Tab => {
                 self.place_block();
+            }
+            KeyCode::Char('g') | KeyCode::Char('G') if self.creative => {
+                self.flying = !self.flying;
+                self.toast(if self.flying { "FLY" } else { "WALK" });
             }
             KeyCode::Char('r') | KeyCode::Char('R') => self.save_toast(),
             KeyCode::Char(d) if d.is_ascii_digit() => {
@@ -482,16 +644,28 @@ impl Game {
             KeyCode::Right => self.keys.right.set(down),
             KeyCode::Up => self.keys.up.set(down),
             KeyCode::Down => self.keys.down.set(down),
-            KeyCode::Char(' ') => self.keys.space.set(down),
+            KeyCode::Char(' ') => {
+                self.keys.space.set(down);
+                if !down {
+                    self.keys.jump = false;
+                }
+            }
             KeyCode::Char('z') | KeyCode::Char('Z') => self.keys.sneak.set(down),
             KeyCode::Modifier(ModifierKeyCode::LeftShift | ModifierKeyCode::RightShift) => {
                 self.keys.shift = down;
+            }
+            KeyCode::Modifier(ModifierKeyCode::LeftControl | ModifierKeyCode::RightControl) => {
+                self.keys.sprint = down
             }
             _ => {}
         }
     }
 
     fn handle_mouse(&mut self, m: MouseEvent) {
+        if self.is_paused() {
+            self.mouse_armed = false;
+            return;
+        }
         let x = m.column as i32;
         let y = m.row as i32;
         match m.kind {
@@ -509,9 +683,6 @@ impl Game {
                 self.mine_target = None;
             }
             MouseEventKind::Drag(_) | MouseEventKind::Moved => {
-                if x >= self.term_cols as i32 || y >= self.term_rows as i32 {
-                    self.pixel_mouse = true;
-                }
                 if !self.mouse_armed {
                     self.mouse = (x, y);
                     self.mouse_armed = true;
@@ -530,17 +701,12 @@ impl Game {
                         .saturating_add(dx.unsigned_abs() + dy.unsigned_abs());
                 }
                 // 1016 reports pixels. Cell reports are scaled to pixels first.
-                let sens = std::env::var("TERMINAL_CRAFT_SENS")
-                    .or_else(|_| std::env::var("TUICRAFT_SENS"))
-                    .ok()
-                    .and_then(|s| s.parse().ok())
-                    .unwrap_or(0.0024f32);
                 let (px, py) = if self.pixel_mouse {
                     (dx as f32, dy as f32)
                 } else {
                     (dx as f32 * self.cell_w, dy as f32 * self.cell_h)
                 };
-                self.player.look(-px * sens, -py * sens);
+                self.relative_look(px, py);
             }
             MouseEventKind::ScrollUp => {
                 self.slot = (self.slot + 5) % 6;
@@ -555,7 +721,7 @@ impl Game {
     }
 
     fn tick_mining(&mut self, dt: f32) {
-        if self.help || self.map || !(self.lmb || self.mine_key.held(self.keys.saw_release)) {
+        if self.is_paused() || !(self.lmb || self.mine_key.held(self.keys.saw_release)) {
             self.mine_target = None;
             self.mine_progress = 0.0;
             return;
@@ -602,7 +768,7 @@ impl Game {
     }
 
     fn place_block(&mut self) {
-        if self.help || self.map {
+        if self.is_paused() {
             return;
         }
         self.view.swing();
@@ -666,6 +832,10 @@ mod tests {
     use crate::block::Block;
     use crate::viewmodel::Tool;
 
+    fn key(c: char) -> KeyEvent {
+        KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE)
+    }
+
     fn fixture() -> Game {
         let mut g = Game::new_map(
             42,
@@ -680,6 +850,97 @@ mod tests {
         g.world.set(21, 21, 20, Block::Slate);
         g.inv.terra = 5;
         g
+    }
+
+    #[test]
+    fn flight_toggle_repeat_and_space_release_are_explicit() {
+        let mut g = fixture();
+        g.configure_input(true, true);
+        g.input_event(Event::Key(key('c')));
+        assert!(g.flying);
+        g.input_event(Event::Key(key('g')));
+        assert!(!g.flying);
+        g.input_event(Event::Key(KeyEvent::new_with_kind(
+            KeyCode::Char('g'),
+            KeyModifiers::NONE,
+            KeyEventKind::Repeat,
+        )));
+        assert!(!g.flying);
+        g.input_event(Event::Key(key('g')));
+        assert!(g.flying);
+        g.input_event(Event::Key(key(' ')));
+        g.input_event(Event::Key(KeyEvent::new_with_kind(
+            KeyCode::Char(' '),
+            KeyModifiers::NONE,
+            KeyEventKind::Release,
+        )));
+        assert!(!g.keys.jump);
+    }
+
+    #[test]
+    fn late_repeat_does_not_restart_a_released_key() {
+        let mut g = fixture();
+        g.configure_input(true, true);
+        for kind in [
+            KeyEventKind::Press,
+            KeyEventKind::Release,
+            KeyEventKind::Repeat,
+        ] {
+            g.input_event(Event::Key(KeyEvent::new_with_kind(
+                KeyCode::Char('w'),
+                KeyModifiers::NONE,
+                kind,
+            )));
+        }
+        assert!(!g.keys.w.held(true));
+    }
+
+    #[test]
+    fn enhanced_input_holds_simultaneous_keys_until_real_release() {
+        let mut g = fixture();
+        g.configure_input(true, true);
+        for code in [KeyCode::Char('w'), KeyCode::Char('d'), KeyCode::Right] {
+            g.input_event(Event::Key(KeyEvent::new_with_kind(
+                code,
+                KeyModifiers::NONE,
+                KeyEventKind::Press,
+            )));
+        }
+        g.keys.w.at -= Duration::from_secs(2);
+        assert!(g.keys.w.held(g.keys.saw_release));
+        g.input_event(Event::Key(KeyEvent::new_with_kind(
+            KeyCode::Char('w'),
+            KeyModifiers::NONE,
+            KeyEventKind::Release,
+        )));
+        assert!(!g.keys.w.held(true));
+        assert!(g.keys.d.held(true));
+        assert!(g.keys.right.held(true));
+        g.input_event(Event::FocusLost);
+        assert!(!g.keys.d.held(true));
+        assert!(!g.keys.right.held(true));
+        assert!(g.is_paused());
+    }
+
+    #[test]
+    fn relative_look_has_correct_axes_and_pauses_without_drift() {
+        let mut g = fixture();
+        g.configure_input(true, true);
+        let before = g.player.yaw;
+        g.relative_look(200.0, 0.0);
+        assert!(g.player.yaw > before, "mouse right must turn right");
+        g.input_event(Event::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE)));
+        assert!(g.is_paused());
+        let paused = g.player.yaw;
+        g.relative_look(400.0, 50.0);
+        assert_eq!(g.player.yaw, paused);
+        g.input_event(Event::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE)));
+        assert!(!g.is_paused());
+        g.relative_look(5000.0, 0.0);
+        assert!(
+            g.player.yaw - paused > std::f32::consts::TAU,
+            "relative look must not hit a window edge"
+        );
     }
 
     #[test]

@@ -322,7 +322,7 @@ impl World {
                         || !(1.0..SX as f32).contains(&pose[0])
                         || !(1.0..SY as f32).contains(&pose[1])
                         || !(1.0..SZ as f32).contains(&pose[2])
-                        || pose[4].abs() > 1.35
+                        || pose[4].abs() > std::f32::consts::FRAC_PI_2
                         || extra[0] > 4
                         || extra[1] > 1
                     {
@@ -521,6 +521,28 @@ mod tests {
         assert!(state.is_none());
         fs::remove_file(path).unwrap();
     }
+    #[test]
+    fn near_vertical_camera_pose_survives_save_reload() {
+        let path = std::env::temp_dir().join(format!(
+            "terminal-craft-poles-{}-{}.tcrf",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let world = World::generate(42);
+        let state = SaveState {
+            pose: [48.5, 25.0, 48.5, 0.0, std::f32::consts::FRAC_PI_2 - 0.001],
+            tool: 0,
+            flying: true,
+        };
+        world.save(&path, &[0; 5], true, 0, Some(&state)).unwrap();
+        let loaded = World::load(&path).unwrap().4.unwrap();
+        assert_eq!(loaded.pose, state.pose);
+        std::fs::remove_file(path).unwrap();
+    }
+
     #[test]
     fn rejects_unknown_versions() {
         let path = path();

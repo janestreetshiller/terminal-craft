@@ -1,124 +1,150 @@
 # Terminal Craft
 
-A native Rust voxel sandbox rendered **inside a terminal**. The macOS app opens
-its own kitty window. No Node.js, web server, browser, Chrome profile, or relay
-is involved in this game.
+A native Rust voxel sandbox. **The app now opens a native game window with real
+pointer-locked mouse look.** Literal terminal rendering remains available as an
+option. Both hosts share one game engine, renderer, repository and save format.
+No browser, Node.js server, Chrome profile or relay is involved.
 
 **Canonical repository:** `/Users/main/Metal/terminal-craft`
 
 **App:** `/Applications/Terminal Craft.app`
-**Command:** `terminal-craft` (`terminalcraft` and `termcraft` are compatibility aliases).
 
-The separate browser game is now **Block Craft**, launched by `block-craft` or
+**Command:** `terminal-craft` (`terminalcraft` and `termcraft` remain aliases).
+
+The separate browser game is **Block Craft**, launched by `block-craft` or
 `/Applications/Block Craft.app`. It is not bundled into this repository.
 
-## Feel and performance in 0.8.1
+## Motion in 0.9.0
 
-This release adds a corrected 70-degree camera, procedural material textures,
-target outlines/mining cracks, textured hotbar icons, and eased tool motion.
-Gameplay targets a 60 FPS frame budget. Balanced rendering caps world raster
-work while keeping the hand and HUD at native resolution; use
-`TERMINAL_CRAFT_QUALITY=native terminal-craft` for full-resolution world rendering.
+- Native SDL window, relative mouse input and real pointer lock. Turning does not
+  stop at a window edge; vertical aiming reaches nearly straight up/down.
+- Simultaneous movement, looking, jumping and mining. Native keys stay held until
+  release, without the old terminal timeout or keyboard-repeat delay.
+- Walking, normalized diagonal movement, sprinting, slow/lowered-view sneaking,
+  jumping, creative flight, ascent and descent. Flight respects solid ceilings.
+- Escape pauses and releases the pointer. Losing focus clears held controls and
+  pauses; regaining focus does not silently resume the game or grab the pointer.
+- Mouse/keyboard main and pause menus, save-and-return-to-menu, controls/inventory,
+  a native overhead map, resizable windows and F11 fullscreen.
+- Kitty mode now negotiates press/repeat/release reporting. The verified input
+  probe supersedes the old comment that CSI-u was unsupported.
 
-See [the measured polish report](docs/polish.md) for before/after images,
-CPU benchmark results, methodology, limitations and the reproduction command.
-The previous release verification is retained in `docs/verification.md`.
+This is keyboard/mouse navigation for a bounded sandbox, not a claim of gamepad,
+VR, browser-feature parity or a complete Minecraft implementation. Mobs,
+health/combat and multiplayer have not been ported. Sneaking lowers the viewpoint
+and slows movement; it does not implement crawling or a smaller collision hull.
 
-## Native features
+## Shared game features and rendering
 
-- Seeded voxel terrain, trees, six language-themed regions, and resource mining.
-- Visible first-person arm and hand; distinct pickaxe, axe, shovel, and held blocks.
-- Hit/swing animation, walking bob, hold-to-mine progress, and material-specific tool speeds.
-- Building with six block slots; resource-based CORE, CONDUIT, and BEACON recipes.
-- Survival/resource mode and creative building/flight. Tools are available in both modes.
-- Inventory/recipe/help panel, overhead map, hotbar counts, and debug/FPS display.
-- Collision, movement, jump, mouse/arrow look, keyboard-only mining/building.
-- Native kitty graphics with shared-memory transport and direct transport fallback.
-- ANSI half-block fallback with a visible title menu, hand/tools, and text help.
-- Atomic v2 saves with world, resources, selected block/tool, player position,
-  view direction, creative mode, and flight state. Original v1 worlds remain readable.
+- Seeded voxel terrain, trees and six language-themed regions.
+- First-person arm/hand, held blocks, pickaxe, axe and shovel.
+- Swing/equip animations, movement bob, held mining, material-specific tool speeds.
+- Six building slots and resource-based CORE, CONDUIT and BEACON recipes.
+- Resource/survival and creative modes; tools are available in both modes.
+- Procedural voxel materials, consistent 70-degree render/interaction rays,
+  target outlines, mining cracks, textured hotbar and debug/FPS display.
+- Atomic saves with terrain, resources, selected tool/block, player pose and mode.
+- Optional Kitty graphics transport and ANSI half-block fallback.
 
-This is a bounded native sandbox release, **not browser feature parity or a
-complete Minecraft implementation**. Browser-only mobs, health/combat systems,
-multiplayer, filesystem bridges, and browser inventory/character systems have
-not been ported. No such feature is represented as complete here.
+Gameplay targets a 60 FPS frame budget. Balanced quality bounds world rendering
+cost while drawing the hand/HUD at the host's render resolution. The native host
+uses logical window dimensions and nearest-neighbor presentation on HiDPI
+screens. `TERMINAL_CRAFT_QUALITY=native` requests full-resolution world sampling.
+
+See [native motion verification](docs/motion.md) and the historical
+[0.8.1 polish report](docs/polish.md). CPU timings are not physical display FPS.
 
 ## Controls
 
 | Input | Action |
 |---|---|
-| WASD | Move |
-| Mouse / arrows | Look |
+| WASD | Move; diagonal speed is normalized |
+| Mouse / arrows | Look; native mouse look uses relative motion |
 | Space | Jump / ascend in flight |
+| Ctrl | Sprint |
+| Shift / Z | Sneak (slow, lowered view) / descend in flight |
 | Hold left mouse / E / F | Mine or swing |
 | Right mouse / Q / Tab | Place selected hotbar block |
 | 0 | Empty hand |
 | 7 / 8 / 9 | Pickaxe / axe / shovel |
 | 1–6 | Select and hold block |
-| Mouse wheel / `[` / `]` | Cycle blocks |
-| H / I | Controls, resources, recipes; freezes movement/mining |
-| M | Overhead map |
+| Wheel / `[` / `]` | Cycle blocks |
+| H / I | Controls, inventory and recipes; pauses gameplay |
+| M | Overhead map; pauses gameplay |
 | C | Toggle creative mode |
-| Double Space | Toggle flight in creative mode |
-| Z / Shift | Descend in flight |
+| G / double Space | Toggle flight in creative mode |
 | F3 | Debug information |
+| F11 | Native fullscreen / windowed |
 | R | Save |
-| Esc | Close help/map; otherwise save and quit |
-| Ctrl-C | Save and quit |
+| Esc | Close overlay; otherwise pause/resume and release/recapture pointer |
+| Ctrl-Q / Ctrl-C | Save and quit |
 
-Keyboard-only hold detection uses repeat events and a short timeout where the
-terminal does not supply key-release events. Mouse-hold mining is continuous.
-Native rendering is supported on Unix terminals; kitty is the recommended viewer.
+The native pause menu offers **Resume**, **Save and main menu**, and **Save and
+quit**. Use arrows/W/S and Enter, or click. Controls/map overlays also close on a
+click. Returning from focus loss requires an explicit resume.
+
+Terminal mode cannot provide native pointer lock or native-window fullscreen.
+Kitty supports reliable key release; other terminals without it use the legacy
+400 ms hold fallback. `TERMINAL_CRAFT_LEGACY_INPUT=1` opts out of enhanced key
+reporting for diagnostics. Terminal pause uses the controls overlay.
 
 ## Build, test, install
 
-Requirements: Rust 1.88+ and Cargo; Python 3 for installation/integration tests;
-kitty for the graphical app. Tests and packaging do not require browser services.
+Build requirements: Rust 1.88+ and Cargo, CMake, a C/C++ compiler, and macOS SDK
+command-line tools. Python 3 is used for packaging and integration tests. SDL is
+built and statically linked by Cargo; the installed native app needs **neither
+Homebrew SDL nor Kitty**. Initial dependencies may download. The project-local
+CMake policy setting keeps the vendored SDL build compatible with CMake 4.
 
 ```sh
-cargo build --release --locked
 cargo test --locked
 cargo fmt --check
 cargo clippy --all-targets --locked -- -D warnings
-python3 tests/test_terminal_session.py
 python3 scripts/install_macos.py
-python3 tests/test_install.py
+python3 scripts/verify.py
 ```
 
-Run `bin/terminal-craft` from any checkout; it builds when no release binary is
-present. After source changes, explicitly rebuild or run the installer. The
-macOS bundle embeds the compiled binary and terminal configuration, so it does
-not depend on this repository's path at runtime. The installer repairs CLI
-symlinks after a repository move and archives old app launchers.
+The verifier includes real native-window sessions for both the release and
+packaged binary, plus legacy and enhanced-protocol PTY sessions. GUI tests briefly
+capture the pointer and change fullscreen state, then release it. They create
+separate test worlds and check that normal saves remain unchanged.
 
 ```sh
+terminal-craft                       # native window
+terminal-craft --terminal            # dedicated Kitty window
+terminal-craft --here                # existing terminal
 terminal-craft --help
-terminal-craft --version
-terminal-craft --here
 terminal-craft --check-save /path/to/world.tcrf
+cargo run --release -- --native      # native host directly from source
 ```
 
-## Saves and compatibility
+`bin/terminal-craft` builds if the release binary is missing. After source changes,
+rebuild explicitly or run the installer. The app embeds the binary and optional
+terminal configuration; it does not require the repository at runtime. The
+installer repairs CLI symlinks and backs up previous app bundles.
 
-Default: `~/.local/share/terminal-craft/world.tcrf` (or `$XDG_DATA_HOME/terminal-craft/world.tcrf`).
-On first launch, the old native save at `~/.local/share/tuicraft/world.tcrf` is
-**copied**, never moved or overwritten. Existing new-name saves take precedence.
-Browser profiles and browser worlds remain untouched under their existing paths.
+## Saves and configuration
 
-`TERMINAL_CRAFT_SAVE` selects an explicit world file; `TERMINAL_CRAFT_ASCII=1`
-forces text fallback; `TERMINAL_CRAFT_SENS` adjusts mouse sensitivity;
-`TERMINAL_CRAFT_KITTY` selects a kitty executable. The old `TUICRAFT_SAVE`,
-`TUICRAFT_ASCII`, and `TUICRAFT_SENS` names remain fallback aliases.
+Default: `~/.local/share/terminal-craft/world.tcrf`, or
+`$XDG_DATA_HOME/terminal-craft/world.tcrf`. The old native save under
+`~/.local/share/tuicraft/world.tcrf` is **copied**, never moved or overwritten, on
+first launch when no new-name save exists. Browser worlds remain untouched.
 
-The format signature remains `TCRF` for compatibility. A v2 save cannot be read
-fully by the old native build; the original v1 file is retained for recovery.
+- `TERMINAL_CRAFT_SAVE`: explicit world path.
+- `TERMINAL_CRAFT_SENS`: mouse sensitivity, default `0.0024`.
+- `TERMINAL_CRAFT_QUALITY=native`: full-resolution world sampling.
+- `TERMINAL_CRAFT_ASCII=1`: text fallback in terminal mode only.
+- `TERMINAL_CRAFT_KITTY`: optional terminal-host executable.
 
-## Source provenance
+`TUICRAFT_SAVE`, `TUICRAFT_ASCII` and `TUICRAFT_SENS` remain fallback aliases.
+The format signature remains `TCRF`; v1 and v2 worlds are readable. Older builds
+with the previous pitch limit may reject a new save made looking almost vertically.
 
-`docs/source-import.json` records every imported source file and its SHA-256.
-The retained Rust source had no Git metadata; commit `77e60e9` preserves the
-unmodified import. The original snapshot remains under
-`~/Code/omarchy-craft/projects/TUICraft/current` for history only. Do not use it as
-a second active native checkout. No unrelated Git history was replaced.
+## Provenance
 
-This repository is local. It has not been published or pushed to a hosting service.
+`docs/source-import.json` records imported files and SHA-256 hashes. The original
+Rust snapshot had no Git metadata; commit `77e60e9` preserves the unmodified import.
+`~/Code/omarchy-craft/projects/TUICraft/current` is a retained historical snapshot,
+not another active native checkout. Existing Git history was preserved.
+
+This repository is local. It has not been pushed to a hosting service.

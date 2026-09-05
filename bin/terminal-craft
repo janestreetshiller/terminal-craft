@@ -13,8 +13,12 @@ else
     cargo build --release --locked --manifest-path "$ROOT/Cargo.toml"
   fi
 fi
-if [[ "${1:-}" == --here ]]; then shift; exec "$GAME" "$@"; fi
-if [[ $# -gt 0 ]]; then exec "$GAME" "$@"; fi
+case "${1:-}" in
+  --here) shift; exec "$GAME" --here "$@" ;;
+  --terminal) shift ;;
+  "") exec "$GAME" --native ;;
+  *) exec "$GAME" "$@" ;;
+esac
 KITTY="${TERMINAL_CRAFT_KITTY:-}"
 if [[ -z "$KITTY" ]]; then
   for candidate in /Applications/kitty.app/Contents/MacOS/kitty "$HOME/Applications/k1tty.app/Contents/MacOS/kitty" /opt/homebrew/bin/kitty /usr/bin/kitty; do
@@ -22,10 +26,10 @@ if [[ -z "$KITTY" ]]; then
   done
 fi
 if [[ ! -x "$KITTY" ]]; then
-  printf 'Terminal Craft needs kitty for its graphical window. Use --here for terminal fallback.\n' >&2
+  printf 'Terminal mode needs Kitty. The default native window does not. Use --here for terminal fallback.\n' >&2
   exit 1
 fi
-exec "$KITTY" --detach --title "Terminal Craft" --config "$CONF" \
+exec "$KITTY" --detach --title "Terminal Craft — Terminal Mode" --config "$CONF" \
   --override remember_window_size=no --override confirm_os_window_close=0 \
   --override macos_quit_when_last_window_closed=yes \
-  --override shell_integration=disabled --directory "$HOME" -e "$GAME"
+  --override shell_integration=disabled --directory "$HOME" -e "$GAME" --here

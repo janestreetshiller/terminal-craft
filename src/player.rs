@@ -11,6 +11,8 @@ pub struct Player {
     pub pitch: f32,
     pub vy: f32,
     pub flying: bool,
+    pub sprinting: bool,
+    pub crouching: bool,
     pub on_ground: bool,
 }
 
@@ -25,6 +27,8 @@ impl Player {
             pitch: 0.12,
             vy: 0.0,
             flying: false,
+            sprinting: false,
+            crouching: false,
             on_ground: true,
         }
     }
@@ -35,12 +39,17 @@ impl Player {
     }
 
     pub fn eye(&self) -> (f32, f32, f32) {
-        (self.x, self.y + 1.62, self.z)
+        (
+            self.x,
+            self.y + if self.crouching { 1.30 } else { 1.62 },
+            self.z,
+        )
     }
 
     pub fn look(&mut self, dyaw: f32, dpitch: f32) {
         self.yaw += dyaw;
-        self.pitch = (self.pitch + dpitch).clamp(-1.35, 1.35);
+        let limit = std::f32::consts::FRAC_PI_2 - 0.001;
+        self.pitch = (self.pitch + dpitch).clamp(-limit, limit);
     }
 
     pub fn tick(
@@ -54,6 +63,7 @@ impl Player {
         dt: f32,
         creative: bool,
     ) {
+        let old_y = self.y;
         if creative && self.flying {
             self.vy = 0.0;
             if space {
@@ -74,7 +84,20 @@ impl Player {
             self.y += self.vy * dt;
         }
 
-        let speed = if self.flying { 7.3 } else { 4.3 };
+        self.crouching = !self.flying && sneak;
+        let speed = if self.flying {
+            if self.sprinting {
+                12.0
+            } else {
+                8.0
+            }
+        } else if self.crouching {
+            1.6
+        } else if self.sprinting {
+            4.3 * 1.35
+        } else {
+            4.3
+        };
         let (fx, _, fz) = {
             let (lx, _, lz) = (self.yaw.cos(), 0.0, self.yaw.sin());
             let rx = -lz;
@@ -90,7 +113,7 @@ impl Player {
 
         // Y collision after gravity
         if self.collides(world, self.x, self.y, self.z) {
-            if self.vy < 0.0 {
+            if self.y < old_y {
                 self.y = self.y.floor() + 0.001;
                 // climb out of floor
                 while self.collides(world, self.x, self.y, self.z) {
@@ -102,7 +125,7 @@ impl Player {
                 self.vy = 0.0;
                 self.on_ground = true;
             } else {
-                self.y -= self.vy * dt;
+                self.y = old_y;
                 self.vy = 0.0;
             }
         } else {
@@ -272,6 +295,82 @@ pub fn raycast(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn full_vertical_look_and_flight_respect_solid_ceilings() {
+        let mut world = World::generate(42);
+        for x in 15..25 {
+            for z in 15..25 {
+                for y in 15..25 {
+                    world.set(x, y, z, Block::Air);
+                }
+                world.set(x, 15, z, Block::Slate);
+                world.set(x, 19, z, Block::Slate);
+            }
+        }
+        let mut p = Player::spawn(&world);
+        p.x = 20.5;
+        p.z = 20.5;
+        p.y = 16.001;
+        p.flying = true;
+        p.look(0.0, 100.0);
+        assert!(p.pitch > 1.55);
+        p.look(0.0, -200.0);
+        assert!(p.pitch < -1.55);
+        for _ in 0..40 {
+            p.tick(&world, 0.0, 0.0, false, false, true, 0.016, true);
+            assert!(!p.collides(&world, p.x, p.y, p.z));
+        }
+        assert!(p.y < 18.0);
+        for _ in 0..80 {
+            p.tick(&world, 0.0, 0.0, false, true, false, 0.016, true);
+        }
+        assert!(p.y >= 16.0 && p.y < 16.1);
+    }
+
+    #[test]
+    fn sprint_sneak_and_diagonal_motion_have_consistent_speeds() {
+        let mut world = World::generate(42);
+        for x in 15..30 {
+            for z in 15..30 {
+                for y in 15..25 {
+                    world.set(x, y, z, if y == 15 { Block::Slate } else { Block::Air });
+                }
+            }
+        }
+        let run = |sprint: bool, sneak: bool, diagonal: bool| {
+            let mut p = Player::spawn(&world);
+            p.x = 20.5;
+            p.y = 16.001;
+            p.z = 20.5;
+            p.yaw = 0.0;
+            p.sprinting = sprint;
+            for _ in 0..10 {
+                p.tick(
+                    &world,
+                    if diagonal { 1.0 } else { 0.0 },
+                    1.0,
+                    false,
+                    sneak,
+                    false,
+                    1.0 / 60.0,
+                    false,
+                );
+            }
+            (
+                ((p.x - 20.5).powi(2) + (p.z - 20.5).powi(2)).sqrt(),
+                p.eye().1 - p.y,
+            )
+        };
+        let (walk, eye) = run(false, false, false);
+        let (sprint, _) = run(true, false, false);
+        let (sneak, low_eye) = run(false, true, false);
+        let (diagonal, _) = run(false, false, true);
+        assert!(sprint > walk * 1.3);
+        assert!(sneak < walk * 0.5);
+        assert!(low_eye < eye);
+        assert!((walk - diagonal).abs() < 0.001);
+    }
+
     #[test]
     fn walking_on_flat_ground_does_not_require_jumping() {
         let mut world = World::generate(42);

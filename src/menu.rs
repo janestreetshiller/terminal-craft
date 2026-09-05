@@ -408,8 +408,8 @@ fn pump(
     }
 }
 
-fn mouse_px(col: u16, row: u16, cell_w: u16, cell_h: u16, cols: u16, rows: u16) -> (i32, i32) {
-    if col >= cols || row >= rows {
+fn mouse_px(col: u16, row: u16, cell_w: u16, cell_h: u16, _cols: u16, _rows: u16) -> (i32, i32) {
+    if crate::kitty_input() {
         (col as i32, row as i32)
     } else {
         (col as i32 * cell_w as i32, row as i32 * cell_h as i32)

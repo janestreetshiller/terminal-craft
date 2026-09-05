@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build/package Terminal Craft locally. No downloads, uploads, or save resets."""
+"""Build/package Terminal Craft locally. No uploads or save resets; initial Cargo dependencies may download."""
 from pathlib import Path
 from datetime import datetime
 import hashlib
@@ -33,8 +33,8 @@ shutil.copy2(ROOT/'kitty-minigame.conf',resources/'kitty-minigame.conf')
 with (contents/'Info.plist').open('wb') as f:
     plistlib.dump({'CFBundleName':'Terminal Craft','CFBundleDisplayName':'Terminal Craft',
       'CFBundleIdentifier':'local.terminal-craft','CFBundleExecutable':'launch',
-      'CFBundlePackageType':'APPL','CFBundleShortVersionString':'0.8.1','CFBundleVersion':'9',
-      'LSUIElement':True,'NSHighResolutionCapable':True},f)
+      'CFBundlePackageType':'APPL','CFBundleShortVersionString':'0.9.0','CFBundleVersion':'10',
+      'LSUIElement':False,'NSHighResolutionCapable':True},f)
 subprocess.run(['codesign','--force','--sign','-',str(app)],check=True)
 subprocess.run(['codesign','--verify','--strict',str(app)],check=True)
 local_bin.mkdir(parents=True,exist_ok=True)

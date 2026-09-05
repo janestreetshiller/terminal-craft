@@ -1,0 +1,132 @@
+{
+  "version": "0.9.0",
+  "hardware": "Apple M4",
+  "verification": {
+    "timestamp": "2026-09-05T02:18:31.584253+00:00",
+    "results": [
+      {
+        "command": [
+          "cargo",
+          "fmt",
+          "--check"
+        ],
+        "exit_code": 0,
+        "log": "/Users/main/Metal/terminal-craft/target/verification/1.log"
+      },
+      {
+        "command": [
+          "cargo",
+          "clippy",
+          "--all-targets",
+          "--locked",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 0,
+        "log": "/Users/main/Metal/terminal-craft/target/verification/2.log"
+      },
+      {
+        "command": [
+          "cargo",
+          "test",
+          "--locked"
+        ],
+        "exit_code": 0,
+        "log": "/Users/main/Metal/terminal-craft/target/verification/3.log",
+        "rust_tests_passed": 40
+      },
+      {
+        "command": [
+          "cargo",
+          "build",
+          "--release",
+          "--locked"
+        ],
+        "exit_code": 0,
+        "log": "/Users/main/Metal/terminal-craft/target/verification/4.log"
+      },
+      {
+        "command": [
+          "/Applications/Xcode-beta.app/Contents/Developer/usr/bin/python3",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "tests",
+          "-v"
+        ],
+        "exit_code": 0,
+        "log": "/Users/main/Metal/terminal-craft/target/verification/5.log",
+        "python_tests_passed": 6
+      },
+      {
+        "command": [
+          "git",
+          "diff",
+          "--check"
+        ],
+        "exit_code": 0,
+        "log": "/Users/main/Metal/terminal-craft/target/verification/6.log"
+      }
+    ],
+    "passed": true,
+    "release_sha256": "8c112f84af001c9cba0937ca2d6218df9165e98c434616c3b76a3b95f13e14ea",
+    "installed_sha256": "8c112f84af001c9cba0937ca2d6218df9165e98c434616c3b76a3b95f13e14ea",
+    "installed_matches_release": true
+  },
+  "native_release": {
+    "resize": true,
+    "fullscreen_round_trip": true,
+    "passed": true,
+    "frames": 142,
+    "walk_distance": 0.2952984,
+    "immediate_stop": true,
+    "pause_and_focus_freeze": true,
+    "turn_radians": 9.6,
+    "max_pitch": 1.5697963,
+    "jump": true,
+    "flight_ascend": true,
+    "flight_descend": true,
+    "pointer_locked": true,
+    "pointer_released_on_pause": true,
+    "pointer_released_on_exit": true,
+    "main_menu_return": true,
+    "save_reload_exact": true,
+    "native_frame_median_ms": 7.889416999999999
+  },
+  "native_installed": {
+    "resize": true,
+    "fullscreen_round_trip": true,
+    "passed": true,
+    "frames": 142,
+    "walk_distance": 0.2952984,
+    "immediate_stop": true,
+    "pause_and_focus_freeze": true,
+    "turn_radians": 9.6,
+    "max_pitch": 1.5697963,
+    "jump": true,
+    "flight_ascend": true,
+    "flight_descend": true,
+    "pointer_locked": true,
+    "pointer_released_on_pause": true,
+    "pointer_released_on_exit": true,
+    "main_menu_return": true,
+    "save_reload_exact": true,
+    "native_frame_median_ms": 7.5268749999999995
+  },
+  "save_preservation": {
+    "/Users/main/.local/share/terminal-craft/world.tcrf": {
+      "matches_early_session_hash": false,
+      "modified_after_verified_tests": true,
+      "current_sha256": "a0e80f262cc28948474cf3b4acf7e4d677cd9e433620505896211f176fa581d8"
+    },
+    "/Users/main/.local/share/tuicraft/world.tcrf": {
+      "matches_early_session_hash": true,
+      "modified_after_verified_tests": false,
+      "current_sha256": "5293afd686dff655600e8f9990207adde33d39336f391331dc50d8e8b3e05ec2"
+    }
+  },
+  "preservation_scope": "Automated native tests passed before/after normal-save hash checks. The live primary save changed after tests finished and the app was opened; it was left untouched, not rolled back. Legacy save still matches the early-session hash.",
+  "input_method": "Tagged scripted SDL keyboard/mouse events through the production event loop; real OS resize/fullscreen and pointer-mode queries. Physical input is excluded in scripted QA except Escape abort; OS focus/window events remain active."
+}
