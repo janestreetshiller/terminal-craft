@@ -33,7 +33,7 @@ shutil.copy2(ROOT/'kitty-minigame.conf',resources/'kitty-minigame.conf')
 with (contents/'Info.plist').open('wb') as f:
     plistlib.dump({'CFBundleName':'Terminal Craft','CFBundleDisplayName':'Terminal Craft',
       'CFBundleIdentifier':'local.terminal-craft','CFBundleExecutable':'launch',
-      'CFBundlePackageType':'APPL','CFBundleShortVersionString':'0.9.0','CFBundleVersion':'10',
+      'CFBundlePackageType':'APPL','CFBundleShortVersionString':'0.9.1','CFBundleVersion':'11',
       'LSUIElement':False,'NSHighResolutionCapable':True},f)
 subprocess.run(['codesign','--force','--sign','-',str(app)],check=True)
 subprocess.run(['codesign','--verify','--strict',str(app)],check=True)

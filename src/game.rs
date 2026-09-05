@@ -505,6 +505,10 @@ impl Game {
     }
 
     fn handle_key(&mut self, k: KeyEvent) -> bool {
+        if k.code == KeyCode::F(6) {
+            crate::ui::toggle();
+            return false;
+        }
         if k.modifiers.contains(KeyModifiers::CONTROL) && k.code == KeyCode::Char('c') {
             return true;
         }

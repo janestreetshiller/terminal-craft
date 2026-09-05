@@ -108,8 +108,13 @@ impl Frame {
             for (i, line) in HELP_LINES.iter().enumerate() {
                 let _ = write!(
                     self.buf,
-                    "\x1b[{};2H\x1b[0;37;40m{:<width$}",
+                    "\x1b[{};2H\x1b[{}m{:<width$}",
                     i + 2,
+                    if crate::ui::gilded() {
+                        "38;2;255;232;173;48;2;39;25;15"
+                    } else {
+                        "0;37;40"
+                    },
                     line,
                     width = (cols - 3).max(1) as usize
                 );
@@ -364,6 +369,22 @@ impl Frame {
             );
         }
 
+        if crate::ui::gilded() {
+            for cell in rows.iter_mut().flatten() {
+                if cell.bg == PANEL {
+                    cell.bg = crate::ui::INK;
+                }
+                if cell.bg == AMBER {
+                    cell.bg = crate::ui::GOLD;
+                }
+                if cell.fg == TEXT {
+                    cell.fg = crate::ui::CREAM;
+                }
+                if cell.fg == DIM {
+                    cell.fg = crate::ui::MUTED;
+                }
+            }
+        }
         for row in &rows {
             emit_hud_row(&mut self.buf, row);
         }
@@ -624,16 +645,142 @@ const HELP_LINES: [&str; 14] = [
     "0 HAND   7 PICKAXE   8 AXE   9 SHOVEL",
     "1-6 BLOCKS   SCROLL OR BRACKETS SELECT",
     "C CREATIVE   G / DOUBLE SPACE TOGGLE FLIGHT",
-    "M MAP   F3 DEBUG   R SAVE   F11 FULLSCREEN",
+    "M MAP   F3 DEBUG   F6 UI SKIN   R SAVE",
     "ESC PAUSE / RESUME   CTRL-Q SAVE AND QUIT",
     "CORE - 8 SLATE AND 1 GEM",
     "CONDUIT - 3 SLATE AND 1 SAND",
     "BEACON - 4 SAND AND 1 GEM",
     "TOOLS ARE AVAILABLE IN BOTH GAME MODES",
-    "H / I / ESC CLOSE - CLICK IN NATIVE WINDOW",
+    "H / I / ESC CLOSE   F11 FULLSCREEN",
 ];
 
+fn overlay_gilded_help(rgba: &mut [u8], pw: i32, ph: i32, inv: &Inventory) {
+    use crate::{block::Block, ui};
+    let s = ((pw - 32) / 512).min((ph - 32) / 320).clamp(1, 3);
+    let x = (pw - 512 * s) / 2;
+    let y = (ph - 320 * s) / 2;
+    let label = |p: &mut [u8], xx, yy, t: &str, c, scale| {
+        ui::text(p, pw, ph, x + xx * s, y + yy * s, t, c, (scale * s) as f32);
+    };
+    ui::panel(rgba, pw, ph, x, y, 512 * s, 320 * s);
+    ui::frame(
+        rgba,
+        pw,
+        ph,
+        x + 14 * s,
+        y + 14 * s,
+        484 * s,
+        34 * s,
+        false,
+        false,
+    );
+    label(rgba, 30, 24, "INVENTORY + FIELD GUIDE", ui::CREAM, 2);
+    label(
+        rgba,
+        20,
+        60,
+        "GILDED UI  /  YOUR WORLD IS PAUSED",
+        ui::MUTED,
+        1,
+    );
+    for (xx, ww) in [(14, 266), (292, 206)] {
+        ui::panel(rgba, pw, ph, x + xx * s, y + 80 * s, ww * s, 220 * s);
+    }
+    label(rgba, 26, 94, "CONTROLS AND RECIPES", ui::GOLD, 1);
+    let controls = [
+        ("WASD", "MOVE"),
+        ("MOUSE", "LOOK / ARROWS ALSO WORK"),
+        ("SPACE", "JUMP / ASCEND IN FLIGHT"),
+        ("CTRL", "SPRINT"),
+        ("SHIFT Z", "SNEAK / DESCEND"),
+        ("LMB E/F", "MINE / SWING"),
+        ("RMB Q/TAB", "PLACE SELECTED BLOCK"),
+        ("0 / 7-9", "HAND / PICK / AXE / SHOVEL"),
+        ("1-6 WHEEL", "SELECT BUILDING BLOCK"),
+        ("C / G", "CREATIVE MODE / FLIGHT"),
+        ("M / F3", "MAP / DEBUG INFO"),
+        ("R / CTRL-Q", "SAVE / SAVE AND QUIT"),
+    ];
+    for (i, (key, action)) in controls.iter().enumerate() {
+        label(rgba, 26, 114 + i as i32 * 14, key, ui::GOLD, 1);
+        label(rgba, 100, 114 + i as i32 * 14, action, ui::CREAM, 1);
+    }
+    label(rgba, 304, 94, "MATERIALS", ui::GOLD, 1);
+    let resources = [
+        (Block::Terra, "TERRA", inv.terra),
+        (Block::Slate, "SLATE", inv.slate),
+        (Block::Wood, "WOOD", inv.wood),
+        (Block::Sand, "SAND", inv.sand),
+        (Block::Ruby, "GEM", inv.gem),
+    ];
+    for (i, (block, name, count)) in resources.iter().enumerate() {
+        let xx = 304 + i as i32 * 36;
+        ui::slot(rgba, pw, ph, x + xx * s, y + 112 * s, 32 * s, false, false);
+        block_icon(rgba, pw, ph, x + (xx + 6) * s, y + 118 * s, 20 * s, *block);
+        label(rgba, xx, 150, name, ui::MUTED, 1);
+        label(rgba, xx, 164, &count.to_string(), ui::CREAM, 1);
+    }
+    label(rgba, 304, 192, "BUILDABLE FROM RESOURCES", ui::GOLD, 1);
+    for (i, (block, recipe)) in [
+        (Block::Core, "8 SLATE + 1 GEM"),
+        (Block::Conduit, "3 SLATE + 1 SAND"),
+        (Block::Beacon, "4 SAND + 1 GEM"),
+    ]
+    .iter()
+    .enumerate()
+    {
+        let yy = 214 + i as i32 * 28;
+        block_icon(rgba, pw, ph, x + 306 * s, y + yy * s, 18 * s, *block);
+        label(
+            rgba,
+            332,
+            yy,
+            &format!("{}  X{}", block.name(), inv.held_count(*block)),
+            ui::CREAM,
+            1,
+        );
+        label(rgba, 332, yy + 12, recipe, ui::MUTED, 1);
+    }
+    label(
+        rgba,
+        20,
+        308,
+        "H / I / ESC CLOSE   F6 STYLE   F11 FULLSCREEN",
+        ui::MUTED,
+        1,
+    );
+}
+
+#[cfg(test)]
+mod gilded_overlay_tests {
+    use super::*;
+    #[test]
+    fn ui_punctuation_has_visible_glyphs() {
+        for ch in ['/', '+', '|', ':', '[', ']'] {
+            assert!(glyph(ch).is_some_and(|bits| bits != 0), "missing {ch}");
+        }
+    }
+    #[test]
+    fn field_guide_draws_gold_and_preserves_pixels_outside_panel() {
+        for (w, h) in [(640, 420), (960, 640), (1100, 720), (1800, 1100)] {
+            let mut pixels = vec![77; w * h * 4];
+            overlay_gilded_help(&mut pixels, w as i32, h as i32, &Inventory::default());
+            assert!(pixels
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .any(|c| c[..3] == [220, 167, 58]));
+            assert_eq!(&pixels[..w * 4], vec![77; w * 4]);
+            assert_eq!(&pixels[(h - 1) * w * 4..], vec![77; w * 4]);
+        }
+    }
+}
+
 fn overlay_help(rgba: &mut [u8], pw: i32, ph: i32, inv: &Inventory) {
+    if crate::ui::gilded() {
+        overlay_gilded_help(rgba, pw, ph, inv);
+        return;
+    }
     let scale = ((pw as f32 / 350.0).min(ph as f32 / 270.0))
         .floor()
         .clamp(1.0, 3.0);
@@ -757,6 +904,9 @@ fn overlay_hud(
     let bar_w = slot_px * 6 + gap * 5 + (craft_gap - gap);
     let x0 = (pw - bar_w) / 2;
     let y0 = ph - bottom - slot_px;
+    if crate::ui::gilded() {
+        crate::ui::panel(rgba, pw, ph, x0 - 10, y0 - 8, bar_w + 20, slot_px + 16);
+    }
 
     let item = if held == Tool::Block {
         HOTBAR[slot].name()
@@ -803,8 +953,12 @@ fn overlay_hud(
         } else {
             (70, 62, 54)
         };
-        fill_rect(rgba, pw, ph, x, y, slot_px, slot_px, PANEL);
-        stroke_rect(rgba, pw, ph, x, y, slot_px, slot_px, border, frame);
+        if crate::ui::gilded() {
+            crate::ui::slot(rgba, pw, ph, x, y, slot_px, selected, selected && deny);
+        } else {
+            fill_rect(rgba, pw, ph, x, y, slot_px, slot_px, PANEL);
+            stroke_rect(rgba, pw, ph, x, y, slot_px, slot_px, border, frame);
+        }
         block_icon(rgba, pw, ph, x + 7, y + 7, slot_px - 14, *block);
         let gs = (scale * 1.6).clamp(1.0, 3.0);
         blit_text_px(
@@ -814,7 +968,13 @@ fn overlay_hud(
             x + border + 2,
             y + border + 1,
             &format!("{}", i + 1),
-            if selected { AMBER } else { DIM },
+            if crate::ui::gilded() {
+                crate::ui::INK
+            } else if selected {
+                AMBER
+            } else {
+                DIM
+            },
             gs,
         );
         let n = inv.held_count(*block);
@@ -831,7 +991,11 @@ fn overlay_hud(
             x + slot_px - border - 2 - cw,
             y + slot_px - border - (7.0 * gs).round() as i32,
             &count,
-            TEXT,
+            if crate::ui::gilded() {
+                crate::ui::INK
+            } else {
+                TEXT
+            },
             gs,
         );
     }
@@ -959,6 +1123,12 @@ fn glyph(ch: char) -> Option<u64> {
         'X' => 0b10001_10001_01010_00100_01010_10001_10001,
         'Y' => 0b10001_10001_01010_00100_00100_00100_00100,
         'Z' => 0b11111_00001_00010_00100_01000_10000_11111,
+        '/' => 0b00001_00010_00010_00100_01000_01000_10000,
+        '+' => 0b00000_00100_00100_11111_00100_00100_00000,
+        '|' => 0b00100_00100_00100_00100_00100_00100_00100,
+        ':' => 0b00000_00100_00100_00000_00100_00100_00000,
+        '[' => 0b01110_01000_01000_01000_01000_01000_01110,
+        ']' => 0b01110_00010_00010_00010_00010_00010_01110,
         '-' => 0b00000_00000_00000_11111_00000_00000_00000,
         ',' => 0b00000_00000_00000_00000_00100_00100_01000,
         '!' => 0b00100_00100_00100_00100_00100_00000_00100,

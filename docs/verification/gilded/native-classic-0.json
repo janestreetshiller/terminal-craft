@@ -1,0 +1,22 @@
+{
+  "ui_theme": "CLASSIC",
+  "ui_theme_round_trip": true,
+  "resize": true,
+  "fullscreen_round_trip": true,
+  "passed": true,
+  "frames": 142,
+  "walk_distance": 0.2952984,
+  "immediate_stop": true,
+  "pause_and_focus_freeze": true,
+  "turn_radians": 9.6,
+  "max_pitch": 1.5697963,
+  "jump": true,
+  "flight_ascend": true,
+  "flight_descend": true,
+  "pointer_locked": true,
+  "pointer_released_on_pause": true,
+  "pointer_released_on_exit": true,
+  "main_menu_return": true,
+  "save_reload_exact": true,
+  "native_frame_median_ms": 7.4345
+}

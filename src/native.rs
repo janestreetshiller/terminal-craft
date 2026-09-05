@@ -47,6 +47,7 @@ fn key_event(key: Keycode, mods: Mod, down: bool, repeat: bool) -> Option<Event>
         Keycode::Up => KeyCode::Up,
         Keycode::Down => KeyCode::Down,
         Keycode::F3 => KeyCode::F(3),
+        Keycode::F6 => KeyCode::F(6),
         Keycode::LShift => KeyCode::Modifier(ModifierKeyCode::LeftShift),
         Keycode::RShift => KeyCode::Modifier(ModifierKeyCode::RightShift),
         Keycode::LCtrl => KeyCode::Modifier(ModifierKeyCode::LeftControl),
@@ -109,7 +110,12 @@ fn hit_button(rects: &[Rect], x: i32, y: i32) -> Option<usize> {
         .position(|r| x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h)
 }
 fn text_center(p: &mut [u8], w: i32, h: i32, y: i32, text: &str, color: (u8, u8, u8), scale: f32) {
-    render::blit_text_px(
+    let paint = if crate::ui::gilded() {
+        crate::ui::text
+    } else {
+        render::blit_text_px
+    };
+    paint(
         p,
         w,
         h,
@@ -136,6 +142,28 @@ fn panel(
     }
     let rects = buttons(w, h, labels.len());
     let title_y = rects[0].y - 80;
+    if crate::ui::gilded() {
+        let first = rects[0];
+        let last = rects[rects.len() - 1];
+        crate::ui::panel(
+            p,
+            w,
+            h,
+            first.x - 14,
+            first.y - 14,
+            first.w + 28,
+            last.y + last.h - first.y + 28,
+        );
+        text_center(
+            p,
+            w,
+            h,
+            title_y + 38,
+            "GILDED UI  /  VISUAL MOD",
+            crate::ui::GOLD,
+            1.0,
+        );
+    }
     text_center(
         p,
         w,
@@ -152,8 +180,12 @@ fn panel(
         } else {
             (60, 73, 71)
         };
-        render::fill_rect(p, w, h, r.x, r.y, r.w, r.h, color);
-        render::fill_rect(p, w, h, r.x + 2, r.y + 2, r.w - 4, r.h - 4, (23, 30, 31));
+        if crate::ui::gilded() {
+            crate::ui::frame(p, w, h, r.x, r.y, r.w, r.h, i == selected, disabled);
+        } else {
+            render::fill_rect(p, w, h, r.x, r.y, r.w, r.h, color);
+            render::fill_rect(p, w, h, r.x + 2, r.y + 2, r.w - 4, r.h - 4, (23, 30, 31));
+        }
         text_center(
             p,
             w,
@@ -175,7 +207,10 @@ fn panel(
         w,
         h,
         h - 24,
-        "NATIVE RUST   |   NO BROWSER OR SERVER",
+        &format!(
+            "{} UI   |   F6 SWITCH STYLE   |   NATIVE RUST",
+            crate::ui::name()
+        ),
         render::DIM,
         1.0,
     );
@@ -185,6 +220,9 @@ pub(crate) fn paint_map(p: &mut [u8], w: i32, h: i32, world: &World, player: &Pl
     let scale = ((w - 60) / SX).min((h - 110) / SZ).max(1);
     let ox = (w - SX * scale) / 2;
     let oy = (h - SZ * scale) / 2;
+    if crate::ui::gilded() {
+        crate::ui::panel(p, w, h, ox - 12, oy - 12, SX * scale + 24, SZ * scale + 24);
+    }
     for z in 0..SZ {
         for x in 0..SX {
             let y = world.surface_y(x, z);
@@ -268,7 +306,10 @@ pub fn run(path: PathBuf, smoke_dir: Option<PathBuf>) -> io::Result<()> {
             if index == 40 {
                 canvas.window_mut().set_size(960, 640).map_err(err)?;
             }
-            if index == 44 {
+            if index == 128 {
+                canvas.window_mut().set_size(640, 420).map_err(err)?;
+            }
+            if index == 44 || index == 131 {
                 canvas.window_mut().set_size(1100, 720).map_err(err)?;
             }
         }
@@ -328,6 +369,13 @@ pub fn run(path: PathBuf, smoke_dir: Option<PathBuf>) -> io::Result<()> {
                     if let Some(g) = game.as_mut() {
                         g.input_event(Event::FocusGained);
                     }
+                }
+                SdlEvent::KeyDown {
+                    keycode: Some(Keycode::F6),
+                    repeat: false,
+                    ..
+                } => {
+                    crate::ui::toggle();
                 }
                 SdlEvent::KeyDown {
                     keycode: Some(Keycode::F11),
@@ -592,6 +640,9 @@ pub fn run(path: PathBuf, smoke_dir: Option<PathBuf>) -> io::Result<()> {
             if index == 40 {
                 s.resize_ok = (w, h) == (960, 640);
             }
+            if index == 129 {
+                s.resize_ok &= (w, h) == (640, 420);
+            }
             if index == 52 {
                 s.fullscreen_ok = canvas.window().fullscreen_state() != FullscreenType::Off;
             }
@@ -635,6 +686,7 @@ struct Smoke {
     dir: PathBuf,
     poses: std::collections::BTreeMap<u32, [f32; 5]>,
     captures: std::collections::BTreeMap<u32, bool>,
+    themes: std::collections::BTreeMap<u32, bool>,
     menu_returned: bool,
     resize_ok: bool,
     fullscreen_ok: bool,
@@ -681,6 +733,7 @@ impl Smoke {
             dir,
             poses: Default::default(),
             captures: Default::default(),
+            themes: Default::default(),
             menu_returned: false,
             resize_ok: false,
             fullscreen_ok: false,
@@ -795,6 +848,10 @@ impl Smoke {
             108 => send(Keycode::LShift, false, Mod::NOMOD)?,
             110 => send(Keycode::G, true, Mod::NOMOD)?,
             114 => send(Keycode::M, true, Mod::NOMOD)?,
+            122 | 123 => {
+                send(Keycode::F6, true, Mod::NOMOD)?;
+                send(Keycode::F6, false, Mod::NOMOD)?;
+            }
             124 => send(Keycode::H, true, Mod::NOMOD)?,
             134 => {
                 send(Keycode::Down, true, Mod::NOMOD)?;
@@ -822,6 +879,7 @@ impl Smoke {
             self.menu_returned = true;
         }
         self.captures.insert(n, captured);
+        self.themes.insert(n, crate::ui::gilded());
         self.times.push(time.as_secs_f64() * 1000.0);
         let name = match n {
             3 => Some("menu"),
@@ -829,6 +887,7 @@ impl Smoke {
             56 => Some("pause"),
             116 => Some("map"),
             126 => Some("controls"),
+            129 => Some("controls-compact"),
             _ => None,
         };
         if let Some(name) = name {
@@ -884,6 +943,8 @@ impl Smoke {
             .ok_or_else(|| err("No saved player state"))?
             .pose;
         let saved_exact = saved == pose(141);
+        let theme_roundtrip = self.themes.get(&121) == self.themes.get(&123)
+            && self.themes.get(&121) != self.themes.get(&122);
         let passed = self.resize_ok
             && self.fullscreen_ok
             && frames == 142
@@ -899,7 +960,8 @@ impl Smoke {
             && unlocked
             && released
             && self.menu_returned
-            && saved_exact;
+            && saved_exact
+            && theme_roundtrip;
         self.times.sort_by(f64::total_cmp);
         let median = self.times[self.times.len() / 2];
         let report=format!("{{\n  \"passed\":{passed},\n  \"frames\":{frames},\n  \"walk_distance\":{walk},\n  \"immediate_stop\":{stopped},\n  \"pause_and_focus_freeze\":{frozen},\n  \"turn_radians\":{turn},\n  \"max_pitch\":{pitch},\n  \"jump\":{jump},\n  \"flight_ascend\":{ascend},\n  \"flight_descend\":{descend},\n  \"pointer_locked\":{locked},\n  \"pointer_released_on_pause\":{unlocked},\n  \"pointer_released_on_exit\":{released},\n  \"main_menu_return\":{},\n  \"save_reload_exact\":{saved_exact},\n  \"native_frame_median_ms\":{median}\n}}\n",self.menu_returned);
@@ -908,6 +970,14 @@ impl Smoke {
             &format!(
                 "{{\n  \"resize\":{},\n  \"fullscreen_round_trip\":{},\n",
                 self.resize_ok, self.fullscreen_ok
+            ),
+            1,
+        );
+        let report = report.replacen(
+            "{\n",
+            &format!(
+                "{{\n  \"ui_theme\":\"{}\",\n  \"ui_theme_round_trip\":{theme_roundtrip},\n",
+                crate::ui::name()
             ),
             1,
         );

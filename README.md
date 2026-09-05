@@ -20,6 +20,18 @@ those terms.
 The separate browser game is **Block Craft**, launched by `block-craft` or
 `/Applications/Block Craft.app`. It is not bundled into this repository.
 
+## Optional Gilded UI in 0.9.1
+
+Launch `terminal-craft --gilded`, or press **F6** in the running game to switch
+between Classic and Gilded. Classic remains the default. Gilded adds original
+gold-and-bronze pixel frames, cream inventory slots, a resource/recipe field
+guide, and matching menu, hotbar and map chrome. It changes no gameplay or saves.
+
+![Gilded inventory and field guide](docs/screenshots/gilded-controls.png)
+
+[Mode selection, screenshots and verification](docs/gilded-ui.md). This is a
+built-in visual mode, not an external mod loader or an imported texture pack.
+
 ## Motion in 0.9.0
 
 - Native SDL window, relative mouse input and real pointer lock. Turning does not
@@ -80,6 +92,7 @@ See [native motion verification](docs/motion.md) and the historical
 | C | Toggle creative mode |
 | G / double Space | Toggle flight in creative mode |
 | F3 | Debug information |
+| F6 | Switch Classic / Gilded UI for this session |
 | F11 | Native fullscreen / windowed |
 | R | Save |
 | Esc | Close overlay; otherwise pause/resume and release/recapture pointer |
@@ -113,12 +126,14 @@ python3 scripts/verify.py
 ```
 
 The verifier includes real native-window sessions for both the release and
-packaged binary, plus legacy and enhanced-protocol PTY sessions. GUI tests briefly
+packaged binary in both UI modes, plus legacy and enhanced-protocol PTY sessions
+in both modes. GUI tests briefly
 capture the pointer and change fullscreen state, then release it. They create
 separate test worlds and check that normal saves remain unchanged.
 
 ```sh
-terminal-craft                       # native window
+terminal-craft                       # native window, Classic UI
+terminal-craft --gilded              # native window, Gilded UI
 terminal-craft --terminal            # dedicated Kitty window
 terminal-craft --here                # existing terminal
 terminal-craft --help
@@ -138,6 +153,7 @@ Default: `~/.local/share/terminal-craft/world.tcrf`, or
 `~/.local/share/tuicraft/world.tcrf` is **copied**, never moved or overwritten, on
 first launch when no new-name save exists. Browser worlds remain untouched.
 
+- `TERMINAL_CRAFT_UI=classic|gilded`: initial UI style; F6 switches live.
 - `TERMINAL_CRAFT_SAVE`: explicit world path.
 - `TERMINAL_CRAFT_SENS`: mouse sensitivity, default `0.0024`.
 - `TERMINAL_CRAFT_QUALITY=native`: full-resolution world sampling.

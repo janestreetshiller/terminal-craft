@@ -17,3 +17,4 @@ jobs:
       - run: cargo build --release --locked
       - run: python3 tests/test_terminal_session.py
       - run: python3 scripts/stress_terminal_session.py
+      - run: python3 tests/test_ui_mode.py

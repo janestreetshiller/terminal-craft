@@ -225,7 +225,11 @@ fn overlay_chrome(
         ph,
         (pw - mw) / 2,
         (ph as f32 * 0.16) as i32 - (10.0 * sub_s) as i32,
-        "NATIVE TERMINAL",
+        if crate::ui::gilded() {
+            "GILDED TERMINAL"
+        } else {
+            "NATIVE TERMINAL"
+        },
         DIM,
         sub_s,
     );
@@ -253,18 +257,22 @@ fn overlay_chrome(
         };
         let frame = if hot { AMBER } else { (90, 64, 32) };
         let fg = if b.enabled { TEXT } else { DIM };
-        fill_rect(rgba, pw, ph, b.x, b.y, b.w, b.h, bg);
-        stroke_rect(
-            rgba,
-            pw,
-            ph,
-            b.x,
-            b.y,
-            b.w,
-            b.h,
-            2.max((scale * 2.0) as i32),
-            frame,
-        );
+        if crate::ui::gilded() {
+            crate::ui::frame(rgba, pw, ph, b.x, b.y, b.w, b.h, hot, !b.enabled);
+        } else {
+            fill_rect(rgba, pw, ph, b.x, b.y, b.w, b.h, bg);
+            stroke_rect(
+                rgba,
+                pw,
+                ph,
+                b.x,
+                b.y,
+                b.w,
+                b.h,
+                2.max((scale * 2.0) as i32),
+                frame,
+            );
+        }
         let ls = (scale * 2.0).clamp(1.0, 3.0);
         let lw = b.label.len() as i32 * (6.0 * ls) as i32;
         blit_text_px(
@@ -278,6 +286,17 @@ fn overlay_chrome(
             ls,
         );
     }
+    let footer = format!("{} UI / F6 SWITCH STYLE", crate::ui::name());
+    blit_text_px(
+        rgba,
+        pw,
+        ph,
+        (pw - crate::render::text_width_px(&footer, 1.0)) / 2,
+        ph - 18,
+        &footer,
+        DIM,
+        1.0,
+    );
 }
 
 fn paint_half(
@@ -343,6 +362,13 @@ fn paint_half(
             label
         );
     }
+    let _ = write!(
+        chrome,
+        "\x1b[{};{}H\x1b[33;40m{} UI / F6 STYLE",
+        rows.saturating_sub(1),
+        center,
+        crate::ui::name()
+    );
     buf.extend_from_slice(chrome.as_bytes());
     out.write_all(&buf)?;
     out.flush()
@@ -369,6 +395,12 @@ fn pump(
         }
         Event::Key(k) if k.kind == KeyEventKind::Release => Ok(None),
         Event::Key(k) => match k.code {
+            KeyCode::F(6) => {
+                if k.kind == KeyEventKind::Press {
+                    crate::ui::toggle();
+                }
+                Ok(None)
+            }
             KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => Ok(Some(None)),
             KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
                 *selected = prev_enabled(*selected, btns);

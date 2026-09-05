@@ -7,6 +7,7 @@ mod menu;
 mod native;
 mod player;
 mod render;
+mod ui;
 mod viewmodel;
 mod world;
 
@@ -101,9 +102,21 @@ pub(crate) fn kitty_input() -> bool {
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    let theme_name = if args.first().map(String::as_str) == Some("--gilded") {
+        "gilded".to_string()
+    } else {
+        std::env::var("TERMINAL_CRAFT_UI").unwrap_or_else(|_| "classic".to_string())
+    };
+    match ui::Theme::parse(&theme_name) {
+        Ok(theme) => ui::set(theme),
+        Err(message) => {
+            eprintln!("terminal-craft: {message}");
+            return ExitCode::from(2);
+        }
+    }
     match args.first().map(String::as_str) {
         Some("--help" | "-h") => {
-            println!("Terminal Craft {}\nNative Rust voxel sandbox — no browser or server.\n\nterminal-craft               Open the native game window (pointer lock)\nterminal-craft --terminal    Open optional Kitty terminal mode\nterminal-craft --here        Play in the current terminal\nterminal-craft --version     Print version\nterminal-craft --check-save PATH   Validate a save without modifying it\n\nWASD move; mouse/arrows look; Space jump/ascend; Ctrl sprint\nShift/Z sneak/descend; C creative; G or double-Space toggle flight\nHold LMB or E/F mine; RMB or Q/Tab place\n0 hand; 7 pickaxe; 8 axe; 9 shovel; 1-6 held blocks\nH/I controls and inventory; M map; F3 debug; F11 native fullscreen\nEsc pause/resume and release pointer; R save; Ctrl-Q save and quit\n\nTERMINAL_CRAFT_QUALITY=native renders at full window resolution.\nTERMINAL_CRAFT_SENS sets mouse sensitivity (default 0.0024).\nDeveloper binary: --native opens the native host; --native-smoke-test NEW_DIR runs isolated GUI QA.",env!("CARGO_PKG_VERSION"));
+            println!("Terminal Craft {}\nNative Rust voxel sandbox — no browser or server.\n\nterminal-craft               Open the native game window (pointer lock)\nterminal-craft --gilded      Open native window with Gilded UI skin\nterminal-craft --terminal    Open optional Kitty terminal mode\nterminal-craft --here        Play in the current terminal\nterminal-craft --version     Print version\nterminal-craft --check-save PATH   Validate a save without modifying it\n\nWASD move; mouse/arrows look; Space jump/ascend; Ctrl sprint\nShift/Z sneak/descend; C creative; G or double-Space toggle flight\nHold LMB or E/F mine; RMB or Q/Tab place\n0 hand; 7 pickaxe; 8 axe; 9 shovel; 1-6 held blocks\nH/I controls and inventory; M map; F3 debug; F11 native fullscreen\nEsc pause/resume and release pointer; R save; Ctrl-Q save and quit\nF6 switches Classic / Gilded UI during this session\n\nTERMINAL_CRAFT_UI=classic|gilded selects the starting UI skin.\nTERMINAL_CRAFT_QUALITY=native renders at full window resolution.\nTERMINAL_CRAFT_SENS sets mouse sensitivity (default 0.0024).\nDeveloper binary: --native opens the native host; --native-smoke-test NEW_DIR runs isolated GUI QA.",env!("CARGO_PKG_VERSION"));
             return ExitCode::SUCCESS;
         }
         Some("--version" | "-V") => {
@@ -127,7 +140,7 @@ fn main() -> ExitCode {
                 }
             };
         }
-        Some("--native" | "--native-smoke-test") => {
+        Some("--native" | "--gilded" | "--native-smoke-test") => {
             let result = if args[0] == "--native-smoke-test" {
                 if args.len() != 2 {
                     Err(io::Error::other(

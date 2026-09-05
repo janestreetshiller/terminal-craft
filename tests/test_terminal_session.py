@@ -38,12 +38,18 @@ class TerminalSessionTests(unittest.TestCase):
     def test_enhanced_press_release_terminal_session(self):
         self.session(True)
 
-    def session(self, enhanced):
+    def test_gilded_legacy_terminal_session(self):
+        self.session(False, "gilded")
+
+    def test_gilded_enhanced_terminal_session(self):
+        self.session(True, "gilded")
+
+    def session(self, enhanced, theme="classic"):
         with tempfile.TemporaryDirectory(prefix='terminal-craft-pty-') as td:
             save=Path(td)/'world.tcrf'; fixture(save)
             master,slave=pty.openpty()
             fcntl.ioctl(slave,termios.TIOCSWINSZ,struct.pack('HHHH',30,100,800,480))
-            env=dict(os.environ,TERM='xterm-256color',TERMINAL_CRAFT_ASCII='1',TERMINAL_CRAFT_SAVE=str(save))
+            env=dict(os.environ,TERM='xterm-256color',TERMINAL_CRAFT_ASCII='1',TERMINAL_CRAFT_SAVE=str(save),TERMINAL_CRAFT_UI=theme)
             env.pop('KITTY_WINDOW_ID',None)
             if enhanced: env.update(TERM='xterm-kitty',KITTY_WINDOW_ID='1')
             proc=subprocess.Popen([str(ROOT/'target/release/terminal-craft')],stdin=slave,stdout=slave,stderr=slave,env=env,close_fds=True)

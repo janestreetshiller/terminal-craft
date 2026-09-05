@@ -1,0 +1,74 @@
+{
+  "timestamp": "2026-09-05T06:42:34.395394+00:00",
+  "results": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "<repository>/target/verification/1.log"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "log": "<repository>/target/verification/2.log"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "log": "<repository>/target/verification/3.log",
+      "rust_tests_passed": 44
+    },
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "log": "<repository>/target/verification/4.log"
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "exit_code": 0,
+      "log": "<repository>/target/verification/5.log",
+      "python_tests_passed": 10
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "<repository>/target/verification/6.log"
+    }
+  ],
+  "passed": true,
+  "release_sha256": "d83304a8c93adb3326b3ebde98585debcdd796937c5cc8b8b4840b41bf00c1e5",
+  "installed_sha256": "d83304a8c93adb3326b3ebde98585debcdd796937c5cc8b8b4840b41bf00c1e5",
+  "installed_matches_release": true
+}

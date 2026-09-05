@@ -1,0 +1,15 @@
+test_installed_app_and_cli_work_without_shell_configuration (test_install.InstallTests) ... ok
+test_release_identifies_as_terminal_craft (test_install.InstallTests) ... ok
+test_native_motion_and_packaged_runtime (test_native_window.NativeWindowTests) ... ok
+test_atomic_copy_preserves_old_open_inode (test_package_files.PackageFilesTests) ... ok
+test_enhanced_press_release_terminal_session (test_terminal_session.TerminalSessionTests) ... ok
+test_gilded_enhanced_terminal_session (test_terminal_session.TerminalSessionTests) ... ok
+test_gilded_legacy_terminal_session (test_terminal_session.TerminalSessionTests) ... ok
+test_legacy_terminal_session (test_terminal_session.TerminalSessionTests) ... ok
+test_help_advertises_gilded_mode_and_live_switch (test_ui_mode.UiModeTests) ... ok
+test_invalid_ui_name_is_rejected_before_startup (test_ui_mode.UiModeTests) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 28.552s
+
+OK
