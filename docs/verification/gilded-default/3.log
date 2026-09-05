@@ -1,0 +1,52 @@
+
+running 45 tests
+test config::tests::explicit_save_path_has_priority_and_never_migrates ... ok
+test block::material_tests::materials_have_readable_surfaces_not_flat_color_tiles ... ok
+test game::tests::map_and_help_do_not_mine_in_background ... ok
+test game::tests::blocked_placement_does_not_spend_inventory ... ok
+test game::tests::enhanced_input_holds_simultaneous_keys_until_real_release ... ok
+test kitty::encoder::tests::base64_matches_rfc4648_vectors ... ok
+test kitty::encoder::tests::oversized_direct_payload_chunks_correctly ... ok
+test kitty::encoder::tests::shm_transmit_is_single_unchunked_sequence ... ok
+test game::tests::late_repeat_does_not_restart_a_released_key ... ok
+test game::tests::flight_toggle_repeat_and_space_release_are_explicit ... ok
+test game::tests::tool_keys_and_block_slots_equip_the_viewmodel ... ok
+test game::tests::quick_click_still_swings_when_released_before_next_frame ... ok
+test game::tests::holding_mines_over_time_and_release_cancels ... ok
+test kitty::transport::tests::concurrent_transports_do_not_collide_on_names ... ok
+test kitty::transport::tests::embedded_transport_is_always_direct ... ok
+test kitty::transport::tests::shm_names_fit_macos_limit ... ok
+test kitty::transport::tests::reclaims_only_after_lag ... ok
+test native::tests::native_buttons_remain_clickable_at_all_window_sizes ... ok
+test native::tests::native_keys_preserve_press_repeat_release_and_modifiers ... ok
+test native::tests::native_capture_is_only_allowed_during_focused_gameplay ... ok
+test game::tests::frame_pacing_targets_sixty_and_blocked_steps_do_not_bob ... ok
+test render::gilded_overlay_tests::ui_punctuation_has_visible_glyphs ... ok
+test render::polish_tests::balanced_raster_is_bounded_and_upscales_without_smearing ... ok
+test render::polish_tests::render_benchmark ... ignored, hardware benchmark, run explicitly in release mode
+test render::polish_tests::daylight_and_inventory_icons_read_as_materials ... ok
+test config::tests::migration_copies_legacy_save_without_overwriting_either_world ... ok
+test game::tests::failed_save_is_reported_not_claimed_saved ... ok
+test player::tests::sprint_sneak_and_diagonal_motion_have_consistent_speeds ... ok
+test ui::tests::theme_names_are_explicit_and_unknown_names_fail ... ok
+test viewmodel::tests::correct_tools_mine_their_material_faster ... ok
+test ui::tests::gilded_frame_is_clipped_and_states_are_distinct ... ok
+test player::tests::walking_on_flat_ground_does_not_require_jumping ... ok
+test viewmodel::tests::holding_a_different_block_changes_the_render ... ok
+test game::tests::relative_look_has_correct_axes_and_pauses_without_drift ... ok
+test viewmodel::tests::hitting_animates_then_returns_to_idle ... ok
+test viewmodel::tests::hand_and_every_tool_have_distinct_visible_geometry ... ok
+test viewmodel::tests::motion_settles_and_equipping_has_weight_instead_of_snapping ... ok
+test player::tests::full_vertical_look_and_flight_respect_solid_ceilings ... ok
+test world::tests::legacy_v1_loads_without_player_metadata ... ok
+test render::polish_tests::rendered_center_matches_the_interaction_ray_at_steep_pitch ... ok
+test world::tests::rejects_unknown_versions ... ok
+test world::tests::near_vertical_camera_pose_survives_save_reload ... ok
+test world::tests::round_trip_preserves_world_inventory_and_player_state ... ok
+test render::polish_tests::mining_damage_is_attached_to_the_target_not_the_screen ... ok
+test render::gilded_overlay_tests::field_guide_draws_gold_and_preserves_pixels_outside_panel ... ok
+
+test result: ok. 44 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s
+     Running unittests src/main.rs (target/debug/deps/terminal_craft-e99b31a747c65d31)

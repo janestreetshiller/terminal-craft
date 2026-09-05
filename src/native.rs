@@ -154,15 +154,6 @@ fn panel(
             first.w + 28,
             last.y + last.h - first.y + 28,
         );
-        text_center(
-            p,
-            w,
-            h,
-            title_y + 38,
-            "GILDED UI  /  VISUAL MOD",
-            crate::ui::GOLD,
-            1.0,
-        );
     }
     text_center(
         p,
@@ -199,21 +190,9 @@ fn panel(
     let hint = if title == "PAUSED" {
         "H CONTROLS   I INVENTORY   M MAP   ESC RESUME"
     } else {
-        "MOUSE / ARROWS / WASD SELECT   ENTER PLAY   F11 FULLSCREEN"
+        "ENTER PLAY   F6 STYLE   F11 FULLSCREEN"
     };
-    text_center(p, w, h, h - 44, hint, render::DIM, 1.0);
-    text_center(
-        p,
-        w,
-        h,
-        h - 24,
-        &format!(
-            "{} UI   |   F6 SWITCH STYLE   |   NATIVE RUST",
-            crate::ui::name()
-        ),
-        render::DIM,
-        1.0,
-    );
+    text_center(p, w, h, h - 24, hint, render::DIM, 1.0);
 }
 pub(crate) fn paint_map(p: &mut [u8], w: i32, h: i32, world: &World, player: &Player) {
     render::fill_rect(p, w, h, 0, 0, w, h, (20, 26, 27));

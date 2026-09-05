@@ -16,17 +16,6 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-const SPLASH: [&str; 8] = [
-    "python prairie!",
-    "native terminal pixels!",
-    "mine terra, craft CORE",
-    "ruby rails!",
-    "a voxel sandbox",
-    "typescript topanga",
-    "wasd + mouse",
-    "100% dirt",
-];
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Action {
     Continue,
@@ -47,14 +36,12 @@ struct Btn {
 
 pub fn run(out: &mut impl Write, save_path: &Path) -> io::Result<Option<Game>> {
     let has_save = save_path.exists();
-    let splash = SPLASH[(seed_now() as usize) % SPLASH.len()];
     let mut selected: usize = if has_save { 0 } else { 1 };
     let world = World::generate(seed_now() ^ 0x51A7);
     let mut presenter = Presenter::new();
     let mut rgba = Vec::new();
     let mut yaw = 0.55f32;
     let mut last = Instant::now();
-    let t0 = Instant::now();
     let pixels = crate::kitty_gfx::available();
 
     loop {
@@ -82,7 +69,7 @@ pub fn run(out: &mut impl Write, save_path: &Path) -> io::Result<Option<Game>> {
             );
             darken_bottom(&mut rgba, pw, ph, 0.42, 0.55);
             let btns = layout_buttons(has_save, pw, ph);
-            overlay_chrome(&mut rgba, pw, ph, splash, selected, &btns, t0.elapsed());
+            overlay_chrome(&mut rgba, pw, ph, selected, &btns);
             let mut tmp = Vec::new();
             let _ = presenter.present(&mut tmp, &rgba, pw as u32, ph as u32);
             out.write_all(b"\x1b[?25l\x1b[H")?;
@@ -113,7 +100,6 @@ pub fn run(out: &mut impl Write, save_path: &Path) -> io::Result<Option<Game>> {
                 oz,
                 yaw,
                 pitch,
-                splash,
                 selected,
                 &frame_btns,
             )?;
@@ -180,22 +166,13 @@ fn layout_buttons(has_save: bool, pw: i32, ph: i32) -> [Btn; 4] {
     ]
 }
 
-fn overlay_chrome(
-    rgba: &mut [u8],
-    pw: i32,
-    ph: i32,
-    splash: &str,
-    selected: usize,
-    btns: &[Btn; 4],
-    elapsed: Duration,
-) {
+fn overlay_chrome(rgba: &mut [u8], pw: i32, ph: i32, selected: usize, btns: &[Btn; 4]) {
     let scale = (ph as f32 / 720.0).clamp(0.6, 1.5);
     let title = "TERMINAL CRAFT";
     let title_s = (scale * 5.2)
         .min((pw - 32) as f32 / (title.len() as f32 * 6.0))
         .floor()
         .clamp(1.0, 8.0);
-    let sub_s = (scale * 1.6).clamp(1.0, 3.0);
     let tw = title.len() as i32 * (6.0 * title_s) as i32;
     blit_text_px(
         rgba,
@@ -216,34 +193,6 @@ fn overlay_chrome(
         title,
         AMBER,
         title_s,
-    );
-    let sub_s = sub_s.round();
-    let mw = 15 * (6.0 * sub_s) as i32;
-    blit_text_px(
-        rgba,
-        pw,
-        ph,
-        (pw - mw) / 2,
-        (ph as f32 * 0.16) as i32 - (10.0 * sub_s) as i32,
-        if crate::ui::gilded() {
-            "GILDED TERMINAL"
-        } else {
-            "NATIVE TERMINAL"
-        },
-        DIM,
-        sub_s,
-    );
-    let pulse = (elapsed.as_millis() / 420).is_multiple_of(2);
-    let sw = splash.len() as i32 * (6.0 * sub_s) as i32;
-    blit_text_px(
-        rgba,
-        pw,
-        ph,
-        (pw - sw) / 2,
-        (ph as f32 * 0.16) as i32 + (8.0 * title_s) as i32,
-        splash,
-        if pulse { AMBER } else { TEXT },
-        sub_s,
     );
 
     for (i, b) in btns.iter().enumerate() {
@@ -286,14 +235,14 @@ fn overlay_chrome(
             ls,
         );
     }
-    let footer = format!("{} UI / F6 SWITCH STYLE", crate::ui::name());
+    let footer = "F6 STYLE";
     blit_text_px(
         rgba,
         pw,
         ph,
-        (pw - crate::render::text_width_px(&footer, 1.0)) / 2,
+        (pw - crate::render::text_width_px(footer, 1.0)) / 2,
         ph - 18,
-        &footer,
+        footer,
         DIM,
         1.0,
     );
@@ -309,7 +258,6 @@ fn paint_half(
     oz: f32,
     yaw: f32,
     pitch: f32,
-    splash: &str,
     selected: usize,
     _btns: &[Btn; 4],
 ) -> io::Result<()> {
@@ -343,11 +291,7 @@ fn paint_half(
     use std::fmt::Write as _;
     let mut chrome = String::new();
     let center = (cols as usize).saturating_sub(28) / 2 + 1;
-    let _ = write!(
-        chrome,
-        "\x1b[3;{}H\x1b[1;33;40mTERMINAL CRAFT\x1b[5;{}H{}",
-        center, center, splash
-    );
+    let _ = write!(chrome, "\x1b[3;{}H\x1b[1;33;40mTERMINAL CRAFT", center);
     for (i, label) in ["CONTINUE", "NEW MAP", "CREATIVE", "QUIT GAME"]
         .iter()
         .enumerate()
@@ -364,10 +308,9 @@ fn paint_half(
     }
     let _ = write!(
         chrome,
-        "\x1b[{};{}H\x1b[33;40m{} UI / F6 STYLE",
+        "\x1b[{};{}H\x1b[33;40mF6 STYLE",
         rows.saturating_sub(1),
-        center,
-        crate::ui::name()
+        center
     );
     buf.extend_from_slice(chrome.as_bytes());
     out.write_all(&buf)?;

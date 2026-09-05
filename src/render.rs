@@ -212,8 +212,6 @@ impl Frame {
             mining,
         );
         view.draw(&mut self.rgba, pw, ph, HOTBAR[slot.min(5)]);
-        let label = format!("{}   H HELP   I INVENTORY", view.tool.name());
-        blit_text_px(&mut self.rgba, pw, ph, 12, ph - 20, &label, DIM, 1.0);
         if mining > 0.0 {
             let w = (pw / 8).max(24);
             let x = (pw - w) / 2;
@@ -674,19 +672,11 @@ fn overlay_gilded_help(rgba: &mut [u8], pw: i32, ph: i32, inv: &Inventory) {
         false,
         false,
     );
-    label(rgba, 30, 24, "INVENTORY + FIELD GUIDE", ui::CREAM, 2);
-    label(
-        rgba,
-        20,
-        60,
-        "GILDED UI  /  YOUR WORLD IS PAUSED",
-        ui::MUTED,
-        1,
-    );
+    label(rgba, 30, 24, "INVENTORY", ui::CREAM, 2);
     for (xx, ww) in [(14, 266), (292, 206)] {
         ui::panel(rgba, pw, ph, x + xx * s, y + 80 * s, ww * s, 220 * s);
     }
-    label(rgba, 26, 94, "CONTROLS AND RECIPES", ui::GOLD, 1);
+    label(rgba, 26, 94, "CONTROLS", ui::GOLD, 1);
     let controls = [
         ("WASD", "MOVE"),
         ("MOUSE", "LOOK / ARROWS ALSO WORK"),
@@ -720,7 +710,7 @@ fn overlay_gilded_help(rgba: &mut [u8], pw: i32, ph: i32, inv: &Inventory) {
         label(rgba, xx, 150, name, ui::MUTED, 1);
         label(rgba, xx, 164, &count.to_string(), ui::CREAM, 1);
     }
-    label(rgba, 304, 192, "BUILDABLE FROM RESOURCES", ui::GOLD, 1);
+    label(rgba, 304, 192, "RECIPES", ui::GOLD, 1);
     for (i, (block, recipe)) in [
         (Block::Core, "8 SLATE + 1 GEM"),
         (Block::Conduit, "3 SLATE + 1 SAND"),

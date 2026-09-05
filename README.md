@@ -20,10 +20,10 @@ those terms.
 The separate browser game is **Block Craft**, launched by `block-craft` or
 `/Applications/Block Craft.app`. It is not bundled into this repository.
 
-## Optional Gilded UI in 0.9.1
+## Gilded UI
 
-Launch `terminal-craft --gilded`, or press **F6** in the running game to switch
-between Classic and Gilded. Classic remains the default. Gilded adds original
+Launch `terminal-craft` for Gilded, or press **F6** in the running game to switch
+between Gilded and Classic. The default skin uses original
 gold-and-bronze pixel frames, cream inventory slots, a resource/recipe field
 guide, and matching menu, hotbar and map chrome. It changes no gameplay or saves.
 
@@ -132,8 +132,9 @@ capture the pointer and change fullscreen state, then release it. They create
 separate test worlds and check that normal saves remain unchanged.
 
 ```sh
-terminal-craft                       # native window, Classic UI
-terminal-craft --gilded              # native window, Gilded UI
+terminal-craft                       # native window, Gilded UI (default)
+TERMINAL_CRAFT_UI=classic terminal-craft  # original Classic UI
+terminal-craft --gilded              # explicitly select Gilded
 terminal-craft --terminal            # dedicated Kitty window
 terminal-craft --here                # existing terminal
 terminal-craft --help

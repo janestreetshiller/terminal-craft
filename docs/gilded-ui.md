@@ -1,6 +1,6 @@
 # Gilded UI — 0.9.1
 
-Gilded is an optional, built-in visual mode for Terminal Craft. It uses original
+Gilded is the default built-in visual mode for Terminal Craft. It uses original
 procedural gold-and-bronze pixel geometry inspired by ornate sandbox-game UI:
 beveled plates, riveted borders, cream slots and shadowed lettering. No image,
 logo, font file or texture was extracted from the supplied reference pack.
@@ -8,7 +8,8 @@ logo, font file or texture was extracted from the supplied reference pack.
 ## Use it
 
 ```sh
-terminal-craft --gilded
+terminal-craft                      # Gilded by default
+TERMINAL_CRAFT_UI=classic terminal-craft  # opt into Classic
 # Same installed app, without relying on a shell PATH:
 '/Applications/Terminal Craft.app/Contents/MacOS/launch' --gilded
 
@@ -18,7 +19,7 @@ TERMINAL_CRAFT_UI=gilded terminal-craft --here
 ```
 
 Press **F6** in a menu or during play to switch Classic/Gilded immediately.
-Some keyboards require **Fn-F6**. Classic remains the default; the environment
+Some keyboards require **Fn-F6**. Gilded is the default; the environment
 variable sets the initial style, and `--gilded` explicitly selects the native
 Gilded launch. Unknown environment values fail with an error rather than silently
 choosing a style. Selection lasts for the process and is not written into a save.
@@ -45,18 +46,36 @@ unchanged. The shared pixel font also gains missing punctuation glyphs.
 
 ![Field guide at the minimum 640 by 420 window](screenshots/gilded-controls-compact.png)
 
-![Installed app running an ordinary disposable world](screenshots/gilded-live-gameplay.png)
+![Earlier standalone app capture, before text trimming](screenshots/gilded-live-gameplay.png)
 
-The menu/guide images come from the real installed SDL smoke-test session, not a
-mockup. The last image is a separate installed-app launch with `--gilded` and a
+The menu/guide images show the current default UI from the real installed SDL
+smoke-test session, not a mockup. The last image predates the text trim and is a separate installed-app launch with `--gilded` and a
 private QA save path. Later OS window captures failed, so follow-up synthetic
 keyboard effects in that extra session are not claimed; it was terminated after
 capture. Scripted native QA below independently verifies style switching and
 save/quit behavior.
 
-## Verification
+## Current default and text-cleanup verification
 
-Final local run: **2026-09-05 UTC / 2026-09-04 PDT**.
+Final local run: **2026-09-05 06:59 UTC**.
+
+- **44 Rust tests and 10 Python integration tests passed.**
+- Six real SDL sessions: release and installed binaries, each with no style
+  setting, explicit Classic, and explicit Gilded. Unconfigured launches select
+  Gilded; all sessions pass live F6 switching and the existing motion/save gates.
+- Normal and deliberately descheduled terminal tests passed in both styles.
+- Formatting, Clippy, release build, app signature and matching installed/release
+  hashes passed. Default menu and compact inventory captures were refreshed.
+- Text cleanup removes mode/engine slogans, random terminal splash lines,
+  redundant HUD hints and verbose headings, preserving controls and counts.
+
+Evidence: [verification/gilded-default](verification/gilded-default/).
+
+## Initial 0.9.1 verification
+
+The historical evidence below predates the text trim and Gilded default.
+
+Initial local run: **2026-09-05 UTC / 2026-09-04 PDT**.
 
 - **44 Rust tests passed**; the explicit rendering benchmark remains opt-in.
 - **10 Python integration tests passed**, including legacy/enhanced PTY gameplay

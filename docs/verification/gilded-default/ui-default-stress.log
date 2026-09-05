@@ -1,0 +1,9 @@
+test_enhanced_press_release_terminal_session (terminal_session.TerminalSessionTests) ... ok
+test_gilded_enhanced_terminal_session (terminal_session.TerminalSessionTests) ... ok
+test_gilded_legacy_terminal_session (terminal_session.TerminalSessionTests) ... ok
+test_legacy_terminal_session (terminal_session.TerminalSessionTests) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 12.804s
+
+OK

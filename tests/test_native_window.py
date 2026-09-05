@@ -16,11 +16,15 @@ class NativeWindowTests(unittest.TestCase):
         before={p:hashlib.sha256(p.read_bytes()).hexdigest() for p in saves if p.exists()}
         binaries=[ROOT/'target/release/terminal-craft',Path('/Applications/Terminal Craft.app/Contents/MacOS/terminal-craft-bin')]
         with tempfile.TemporaryDirectory(prefix='terminal-craft-native-') as temp:
-            for theme in ['classic','gilded']:
+            for theme in ['default','classic','gilded']:
                 for i,binary in enumerate(binaries):
                     with self.subTest(binary=str(binary),theme=theme):
                         directory=Path(temp)/f'{theme}-{i}'
-                        env=dict(os.environ,TERMINAL_CRAFT_UI=theme)
+                        env=os.environ.copy()
+                        if theme == 'default':
+                            env.pop('TERMINAL_CRAFT_UI',None)
+                        else:
+                            env['TERMINAL_CRAFT_UI']=theme
                         run=subprocess.run([str(binary),'--native-smoke-test',str(directory)],env=env,capture_output=True,text=True,timeout=60)
                         if directory.exists():
                             shutil.copytree(directory,ROOT/'target/verification'/f'native-{theme}-{i}',dirs_exist_ok=True)
@@ -28,7 +32,7 @@ class NativeWindowTests(unittest.TestCase):
                         report=json.loads((directory/'report.json').read_text())
                         self.assertTrue(report['passed'],report)
                         self.assertEqual(report['frames'],142)
-                        self.assertEqual(report['ui_theme'],theme.upper())
+                        self.assertEqual(report['ui_theme'],'GILDED' if theme == 'default' else theme.upper())
                         self.assertTrue(report['ui_theme_round_trip'])
                         for name,value in report.items():
                             if isinstance(value,bool): self.assertTrue(value,name)
