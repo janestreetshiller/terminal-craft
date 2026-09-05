@@ -48,19 +48,30 @@ pub struct ViewModel {
     pub tool: Tool,
     swing_left: f32,
     walk_phase: f32,
-    moving: bool,
+    walk_weight: f32,
+    equip_left: f32,
+    last_tool: Tool,
 }
 
 impl ViewModel {
     pub fn swing(&mut self) {
         if self.swing_left <= 0.0 {
-            self.swing_left = 0.30;
+            self.swing_left = 0.34;
         }
     }
 
     pub fn advance(&mut self, dt: f32, moving: bool) {
         self.swing_left = (self.swing_left - dt).max(0.0);
-        self.moving = moving;
+        let target = if moving { 1.0 } else { 0.0 };
+        self.walk_weight += (target - self.walk_weight) * (1.0 - (-12.0 * dt).exp());
+        if self.walk_weight < 0.001 {
+            self.walk_weight = 0.0;
+        }
+        self.equip_left = (self.equip_left - dt).max(0.0);
+        if self.tool != self.last_tool {
+            self.last_tool = self.tool;
+            self.equip_left = 0.20;
+        }
         if moving {
             self.walk_phase = (self.walk_phase + dt * 9.0) % (2.0 * PI);
         }
@@ -70,16 +81,20 @@ impl ViewModel {
         if pw < 2 || ph < 2 {
             return;
         }
-        let swing = (self.swing_left / 0.30 * PI).sin();
-        let bob = if self.moving {
-            self.walk_phase.sin() * 0.035
-        } else {
+        let progress = 1.0 - self.swing_left / 0.34;
+        let swing = if self.swing_left <= 0.0 {
             0.0
+        } else if progress < 0.18 {
+            -0.10 * (progress / 0.18 * PI).sin()
+        } else {
+            ((progress - 0.18) / 0.82 * PI).sin().powf(0.8)
         };
+        let bob = self.walk_phase.sin() * 0.035 * self.walk_weight;
+        let equip = (self.equip_left / 0.20 * PI * 0.5).sin() * 0.55;
         let scale = ph as f32 * 0.25;
         let angle = -0.13 - swing * 0.8;
         let cx = pw as f32 * 0.79 - swing * scale * 0.55;
-        let cy = ph as f32 * 0.82 + (bob + swing * 0.12) * scale;
+        let cy = ph as f32 * 0.82 + (bob + equip + swing * 0.12) * scale;
         let mut poly = |points: &[(f32, f32)], color| {
             let points: Vec<(f32, f32)> = points
                 .iter()
@@ -271,15 +286,19 @@ fn polygon(rgba: &mut [u8], width: i32, height: i32, vertices: &[(f32, f32)], co
         .min(height - 1);
     for y in min_y..=max_y {
         let scan = y as f32 + 0.5;
-        let mut xs = Vec::with_capacity(vertices.len());
+        let mut xs = [0.0_f32; 16];
+        let mut count = 0;
+        debug_assert!(vertices.len() <= xs.len());
         for i in 0..vertices.len() {
             let (ax, ay) = vertices[i];
             let (bx, by) = vertices[(i + 1) % vertices.len()];
             if (ay <= scan && by > scan) || (by <= scan && ay > scan) {
-                xs.push(ax + (scan - ay) / (by - ay) * (bx - ax));
+                xs[count] = ax + (scan - ay) / (by - ay) * (bx - ax);
+                count += 1;
             }
         }
-        xs.sort_by(|a, b| a.total_cmp(b));
+        let xs = &mut xs[..count];
+        xs.sort_unstable_by(|a, b| a.total_cmp(b));
         for pair in xs.as_chunks::<2>().0 {
             for x in (pair[0].ceil() as i32).max(0)..(pair[1].ceil() as i32).min(width) {
                 let i = ((y * width + x) * 4) as usize;
@@ -324,6 +343,29 @@ mod tests {
             );
             images.push(rgba);
         }
+    }
+
+    #[test]
+    fn motion_settles_and_equipping_has_weight_instead_of_snapping() {
+        let mut view = ViewModel::default();
+        let idle = image(&view);
+        view.advance(0.1, true);
+        view.advance(0.01, false);
+        assert!(
+            image(&view) != idle,
+            "stopping should settle rather than snap"
+        );
+        view.advance(2.0, false);
+        assert!(image(&view) == idle);
+        view.tool = Tool::Pickaxe;
+        let static_tool = image(&view);
+        view.advance(0.04, false);
+        assert!(
+            image(&view) != static_tool,
+            "equipping should dip and return"
+        );
+        view.advance(1.0, false);
+        assert!(image(&view) == static_tool);
     }
 
     #[test]

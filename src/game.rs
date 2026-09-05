@@ -13,6 +13,14 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+fn frame_budget(paused: bool) -> Duration {
+    if paused {
+        Duration::from_millis(50)
+    } else {
+        Duration::from_nanos(16_666_667)
+    }
+}
+
 pub struct Game {
     world: World,
     player: Player,
@@ -225,6 +233,28 @@ impl Game {
         self.toast_until = Instant::now() + Duration::from_millis(1400);
     }
 
+    fn step_player(&mut self, dt: f32, mx: f32, mz: f32, jump: bool) {
+        self.player.flying = self.flying;
+        let before = (self.player.x, self.player.z);
+        if !self.help && !self.map {
+            self.player.tick(
+                &self.world,
+                mx,
+                mz,
+                jump,
+                self.keys.sneak.held(self.keys.saw_release) || self.keys.shift,
+                self.keys.space.held(self.keys.saw_release),
+                dt,
+                self.creative && self.flying,
+            );
+        }
+        let distance = (self.player.x - before.0).abs() + (self.player.z - before.1).abs();
+        self.view.advance(
+            dt,
+            distance > 0.0001 && self.player.on_ground && !self.flying,
+        );
+    }
+
     pub fn run(&mut self, out: &mut impl Write) -> io::Result<()> {
         let (mut cols, mut rows) = terminal::size()?;
         let mut frame = Frame::new(cols, rows);
@@ -284,21 +314,7 @@ impl Game {
             if jump && (self.player.on_ground || self.flying) {
                 self.keys.jump = false;
             }
-            self.player.flying = self.flying;
-            if !self.help && !self.map {
-                self.player.tick(
-                    &self.world,
-                    mx,
-                    mz,
-                    jump,
-                    self.keys.sneak.held(rel) || self.keys.shift,
-                    self.keys.space.held(rel),
-                    dt,
-                    self.creative && self.flying,
-                );
-            }
-            self.view
-                .advance(dt, !self.help && !self.map && (mx != 0.0 || mz != 0.0));
+            self.step_player(dt, mx, mz, jump);
             self.tick_mining(dt);
             self.term_cols = cols;
             self.term_rows = rows;
@@ -353,8 +369,9 @@ impl Game {
             out.flush()?;
             // Bound CPU use without tying gameplay speed to frame rate.
             let spent = now.elapsed();
-            if spent < Duration::from_millis(33) {
-                std::thread::sleep(Duration::from_millis(33) - spent);
+            let budget = frame_budget(self.help || self.map);
+            if spent < budget {
+                std::thread::sleep(budget - spent);
             }
         }
     }
@@ -663,6 +680,23 @@ mod tests {
         g.world.set(21, 21, 20, Block::Slate);
         g.inv.terra = 5;
         g
+    }
+
+    #[test]
+    fn frame_pacing_targets_sixty_and_blocked_steps_do_not_bob() {
+        assert!(frame_budget(false) >= Duration::from_micros(16_600));
+        assert!(frame_budget(false) < Duration::from_millis(17));
+        assert!(frame_budget(true) > frame_budget(false));
+        let mut g = fixture();
+        let mut before = vec![0; 320 * 200 * 4];
+        g.view.draw(&mut before, 320, 200, Block::Terra);
+        g.step_player(0.05, 0.0, 1.0, false);
+        let mut after = vec![0; before.len()];
+        g.view.draw(&mut after, 320, 200, Block::Terra);
+        assert!(
+            before == after,
+            "pressing into a wall must not produce walking bob"
+        );
     }
 
     #[test]

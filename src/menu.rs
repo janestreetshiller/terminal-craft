@@ -77,7 +77,9 @@ pub fn run(out: &mut impl Write, save_path: &Path) -> io::Result<Option<Game>> {
         let pitch = -0.38;
 
         if pixels {
-            fill_view(&mut rgba, pw, ph, &world, ox, oy, oz, yaw, pitch, false);
+            fill_view(
+                &mut rgba, pw, ph, &world, ox, oy, oz, yaw, pitch, false, 0.0,
+            );
             darken_bottom(&mut rgba, pw, ph, 0.42, 0.55);
             let btns = layout_buttons(has_save, pw, ph);
             overlay_chrome(&mut rgba, pw, ph, splash, selected, &btns, t0.elapsed());
@@ -295,7 +297,7 @@ fn paint_half(
     let pw = cols as i32;
     let ph = rows as i32 * 2;
     let mut rgba = vec![0u8; (pw * ph * 4) as usize];
-    fill_view(&mut rgba, pw, ph, world, ox, oy, oz, yaw, pitch, false);
+    fill_view(&mut rgba, pw, ph, world, ox, oy, oz, yaw, pitch, false, 0.0);
     let mut buf = b"\x1b[?25l\x1b[H".to_vec();
     for row in 0..rows as i32 {
         for col in 0..pw {

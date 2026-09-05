@@ -4,20 +4,19 @@ use crate::block::{Inventory, HOTBAR};
 use crate::kitty::Metrics;
 use crate::kitty_gfx::Presenter;
 use crate::player::{raycast, Player};
-use crate::viewmodel::ViewModel;
+use crate::viewmodel::{Tool, ViewModel};
 use crate::world::{World, SX, SZ};
 
 const FOG_NEAR: f32 = 18.0;
 const FOG_FAR: f32 = 42.0;
-const SKY_TOP: (u8, u8, u8) = (70, 99, 155);
-const SKY_HORIZON: (u8, u8, u8) = (232, 160, 92);
-const FOG: (u8, u8, u8) = (209, 154, 102);
+const SKY_TOP: (u8, u8, u8) = (97, 159, 198);
+const SKY_HORIZON: (u8, u8, u8) = (197, 216, 219);
 const HUD_ROWS: i32 = 3;
 pub(crate) const TEXT: (u8, u8, u8) = (239, 230, 214);
-pub(crate) const DIM: (u8, u8, u8) = (138, 133, 120);
-pub(crate) const AMBER: (u8, u8, u8) = (255, 180, 84);
+pub(crate) const DIM: (u8, u8, u8) = (160, 168, 162);
+pub(crate) const AMBER: (u8, u8, u8) = (221, 194, 139);
 const FAIL: (u8, u8, u8) = (255, 106, 94);
-const PANEL: (u8, u8, u8) = (14, 11, 8);
+const PANEL: (u8, u8, u8) = (20, 26, 27);
 
 pub(crate) fn term_metrics(cols: u16, rows: u16) -> Metrics {
     use std::io;
@@ -128,34 +127,17 @@ impl Frame {
         block: crate::block::Block,
     ) {
         let (ox, oy, oz) = player.eye();
-        let (ldx, ldy, ldz) = player.look_dir();
-        // camera basis
-        let len = (ldx * ldx + ldz * ldz).sqrt().max(1e-5);
-        let fx = ldx / len;
-        let fz = ldz / len;
-        let rx = -fz;
-        let rz = fx;
-        let ux = 0.0;
-        let uy = 1.0;
-        let uz = 0.0;
-
-        let fov = 1.15; // ~66 deg
-        let aspect = cols as f32 / (samples_y as f32 * 0.5);
+        let camera = Camera::new(player.yaw, player.pitch);
+        let aspect = cols as f32 / samples_y as f32;
         let mut pixels: Vec<(u8, u8, u8)> = vec![(0, 0, 0); (cols * samples_y) as usize];
 
         for sy in 0..samples_y {
             let ny = 1.0 - ((sy as f32 + 0.5) / samples_y as f32) * 2.0;
             for sx in 0..cols {
                 let nx = ((sx as f32 + 0.5) / cols as f32) * 2.0 - 1.0;
-                let mut dx = fx + rx * nx * fov * aspect + ux * ny * fov;
-                let mut dy = ldy + uy * ny * fov;
-                let mut dz = fz + rz * nx * fov * aspect + uz * ny * fov;
-                let inv = (dx * dx + dy * dy + dz * dz).sqrt().max(1e-6);
-                dx /= inv;
-                dy /= inv;
-                dz /= inv;
+                let (dx, dy, dz) = camera.ray(nx, ny, aspect);
 
-                let color = sample(world, ox, oy, oz, dx, dy, dz);
+                let color = sample(world, ox, oy, oz, dx, dy, dz, None);
                 pixels[(sy * cols + sx) as usize] = color;
             }
         }
@@ -210,7 +192,19 @@ impl Frame {
         if self.rgba.len() != need {
             self.rgba.resize(need, 0);
         }
-        fill_view(&mut self.rgba, pw, ph, world, ox, oy, oz, yaw, pitch, true);
+        fill_view(
+            &mut self.rgba,
+            pw,
+            ph,
+            world,
+            ox,
+            oy,
+            oz,
+            yaw,
+            pitch,
+            true,
+            mining,
+        );
         view.draw(&mut self.rgba, pw, ph, HOTBAR[slot.min(5)]);
         let label = format!("{}   H HELP   I INVENTORY", view.tool.name());
         blit_text_px(&mut self.rgba, pw, ph, 12, ph - 20, &label, DIM, 1.0);
@@ -243,6 +237,7 @@ impl Frame {
             fps,
             debug,
             deny,
+            view.tool,
         );
         if help {
             overlay_help(&mut self.rgba, pw, ph, inv);
@@ -462,6 +457,58 @@ fn emit_hud_row(buf: &mut Vec<u8>, row: &[HudCell]) {
     buf.extend_from_slice(b"\x1b[0m\r\n");
 }
 
+#[derive(Clone, Copy)]
+struct Camera {
+    forward: [f32; 3],
+    right: [f32; 3],
+    up: [f32; 3],
+}
+impl Camera {
+    fn new(yaw: f32, pitch: f32) -> Self {
+        let (sy, cy) = yaw.sin_cos();
+        let (sp, cp) = pitch.sin_cos();
+        Self {
+            forward: [cy * cp, sp, sy * cp],
+            right: [-sy, 0.0, cy],
+            up: [-cy * sp, cp, -sy * sp],
+        }
+    }
+    fn ray(self, nx: f32, ny: f32, aspect: f32) -> (f32, f32, f32) {
+        let spread = (70.0_f32.to_radians() * 0.5).tan();
+        let mut v = [0.0; 3];
+        for (i, value) in v.iter_mut().enumerate() {
+            *value =
+                self.forward[i] + self.right[i] * nx * spread * aspect + self.up[i] * ny * spread;
+        }
+        let length = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+        (v[0] / length, v[1] / length, v[2] / length)
+    }
+}
+
+fn world_extent(w: i32, h: i32, native: bool) -> (i32, i32) {
+    let scale = if native {
+        1
+    } else {
+        ((w + 959) / 960).max((h + 539) / 540).max(1)
+    };
+    ((w + scale - 1) / scale, (h + scale - 1) / scale)
+}
+
+fn upscale_in_place(rgba: &mut [u8], sw: i32, sh: i32, w: i32, h: i32) {
+    if sw == w && sh == h {
+        return;
+    }
+    // Backwards expansion never overwrites a source texel still needed later.
+    for y in (0..h).rev() {
+        for x in (0..w).rev() {
+            let src = ((y * sh / h) * sw + x * sw / w) as usize * 4;
+            let dst = (y * w + x) as usize * 4;
+            let pixel = [rgba[src], rgba[src + 1], rgba[src + 2], rgba[src + 3]];
+            rgba[dst..dst + 4].copy_from_slice(&pixel);
+        }
+    }
+}
+
 pub(crate) fn fill_view(
     rgba: &mut [u8],
     pw: i32,
@@ -473,23 +520,65 @@ pub(crate) fn fill_view(
     yaw: f32,
     pitch: f32,
     crosshair: bool,
+    mining: f32,
 ) {
     if pw < 2 || ph < 2 {
         return;
     }
-    let cp = pitch.cos();
-    let ldx = yaw.cos() * cp;
-    let ldy = pitch.sin();
-    let ldz = yaw.sin() * cp;
-    let len = (ldx * ldx + ldz * ldz).sqrt().max(1e-5);
-    let fx = ldx / len;
-    let fz = ldz / len;
-    let rx = -fz;
-    let rz = fx;
-    let fov = 1.15;
+    let native = std::env::var("TERMINAL_CRAFT_QUALITY").as_deref() == Ok("native");
+    let (rw, rh) = world_extent(pw, ph, native);
+    let camera = Camera::new(yaw, pitch);
+    let [dx, dy, dz] = camera.forward;
+    let selection = if crosshair {
+        raycast(world, ox, oy, oz, dx, dy, dz, 7.0).map(|h| Selection {
+            x: h.x,
+            y: h.y,
+            z: h.z,
+            damage: mining,
+        })
+    } else {
+        None
+    };
+    raster_view(
+        &mut rgba[..(rw * rh * 4) as usize],
+        rw,
+        rh,
+        world,
+        ox,
+        oy,
+        oz,
+        yaw,
+        pitch,
+        selection,
+    );
+    upscale_in_place(rgba, rw, rh, pw, ph);
+    if crosshair {
+        let (x, y) = (pw / 2, ph / 2);
+        // Native-resolution, restrained reticle with contrasting keyline.
+        fill_rect(rgba, pw, ph, x - 6, y - 1, 13, 3, (24, 29, 31));
+        fill_rect(rgba, pw, ph, x - 1, y - 6, 3, 13, (24, 29, 31));
+        fill_rect(rgba, pw, ph, x - 5, y, 11, 1, TEXT);
+        fill_rect(rgba, pw, ph, x, y - 5, 1, 11, TEXT);
+    }
+}
+
+fn raster_view(
+    rgba: &mut [u8],
+    pw: i32,
+    ph: i32,
+    world: &World,
+    ox: f32,
+    oy: f32,
+    oz: f32,
+    yaw: f32,
+    pitch: f32,
+    selection: Option<Selection>,
+) {
+    if pw < 2 || ph < 2 {
+        return;
+    }
+    let camera = Camera::new(yaw, pitch);
     let aspect = pw as f32 / ph as f32;
-    let cx = pw / 2;
-    let cy = ph / 2;
     let threads = std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(4)
@@ -505,22 +594,8 @@ pub(crate) fn fill_view(
                     let ny = 1.0 - ((sy as f32 + 0.5) / ph as f32) * 2.0;
                     for sx in 0..pw {
                         let nx = ((sx as f32 + 0.5) / pw as f32) * 2.0 - 1.0;
-                        let mut dx = fx + rx * nx * fov * aspect;
-                        let mut dy = ldy + ny * fov;
-                        let mut dz = fz + rz * nx * fov * aspect;
-                        let inv = (dx * dx + dy * dy + dz * dz).sqrt().max(1e-6);
-                        dx /= inv;
-                        dy /= inv;
-                        dz /= inv;
-                        let (mut r, mut g, mut b) = sample(world, ox, oy, oz, dx, dy, dz);
-                        if crosshair
-                            && ((sx - cx).abs() <= 1 && (sy - cy).abs() <= 8
-                                || (sy - cy).abs() <= 1 && (sx - cx).abs() <= 8)
-                        {
-                            r = 239;
-                            g = 230;
-                            b = 214;
-                        }
+                        let (dx, dy, dz) = camera.ray(nx, ny, aspect);
+                        let (r, g, b) = sample(world, ox, oy, oz, dx, dy, dz, selection);
                         let i = (ly * pw + sx) as usize * 4;
                         chunk[i] = r;
                         chunk[i + 1] = g;
@@ -610,6 +685,41 @@ pub(crate) fn darken_bottom(rgba: &mut [u8], pw: i32, ph: i32, from: f32, amt: f
     }
 }
 
+fn block_icon(
+    rgba: &mut [u8],
+    pw: i32,
+    ph: i32,
+    x: i32,
+    y: i32,
+    size: i32,
+    block: crate::block::Block,
+) {
+    let half = size as f32 * 0.5;
+    let quarter = size as f32 * 0.25;
+    let height = size as f32 * 0.55;
+    for py in y.max(0)..(y + size + 2).min(ph) {
+        for px in x.max(0)..(x + size).min(pw) {
+            let dx = (px as f32 + 0.5 - (x as f32 + half)) / half;
+            let top = y as f32 + dx.abs() * quarter;
+            let bottom = y as f32 + half - dx.abs() * quarter;
+            let sy = py as f32 + 0.5;
+            let c = if sy >= top && sy < bottom {
+                let dy = (sy - (y as f32 + quarter)) / quarter;
+                block.texel(0, (dx + dy + 1.0) * 0.5, (dy - dx + 1.0) * 0.5)
+            } else if sy >= bottom && sy < bottom + height {
+                block.texel(
+                    if dx < 0.0 { 2 } else { 4 },
+                    dx.abs(),
+                    1.0 - (sy - bottom) / height,
+                )
+            } else {
+                continue;
+            };
+            put_px(rgba, pw, px, py, c);
+        }
+    }
+}
+
 fn overlay_hud(
     rgba: &mut [u8],
     pw: i32,
@@ -623,6 +733,7 @@ fn overlay_hud(
     fps: u32,
     debug: bool,
     deny: bool,
+    held: Tool,
 ) {
     if pw < 8 || ph < 8 {
         return;
@@ -637,6 +748,12 @@ fn overlay_hud(
     let x0 = (pw - bar_w) / 2;
     let y0 = ph - bottom - slot_px;
 
+    let item = if held == Tool::Block {
+        HOTBAR[slot].name()
+    } else {
+        held.name()
+    };
+    let toast = if toast.is_empty() { item } else { toast };
     if !toast.is_empty() {
         let tw = (toast.len() as i32) * (6.0 * scale).round().max(5.0) as i32;
         blit_text_px(
@@ -667,14 +784,8 @@ fn overlay_hud(
         if i >= 3 {
             x += craft_gap - gap;
         }
-        let selected = i == slot;
-        let lift = if selected {
-            (5.0 * scale).round() as i32
-        } else {
-            0
-        };
-        let y = y0 - lift;
-        let fill = block.rgb(0);
+        let selected = i == slot && held == Tool::Block;
+        let y = y0;
         let frame = if selected && deny {
             FAIL
         } else if selected {
@@ -682,21 +793,9 @@ fn overlay_hud(
         } else {
             (70, 62, 54)
         };
-        fill_rect(rgba, pw, ph, x, y, slot_px, slot_px, (14, 11, 8));
+        fill_rect(rgba, pw, ph, x, y, slot_px, slot_px, PANEL);
         stroke_rect(rgba, pw, ph, x, y, slot_px, slot_px, border, frame);
-        let inner = slot_px - border * 2 - 4;
-        if inner > 4 {
-            fill_rect(
-                rgba,
-                pw,
-                ph,
-                x + border + 2,
-                y + border + 2,
-                inner,
-                inner,
-                fill,
-            );
-        }
+        block_icon(rgba, pw, ph, x + 7, y + 7, slot_px - 14, *block);
         let gs = (scale * 1.6).clamp(1.0, 3.0);
         blit_text_px(
             rgba,
@@ -865,9 +964,25 @@ fn itoa3(buf: &mut Vec<u8>, v: u8) {
     }
 }
 
-fn sample(world: &World, ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f32) -> (u8, u8, u8) {
+#[derive(Clone, Copy)]
+struct Selection {
+    x: i32,
+    y: i32,
+    z: i32,
+    damage: f32,
+}
+
+fn sample(
+    world: &World,
+    ox: f32,
+    oy: f32,
+    oz: f32,
+    dx: f32,
+    dy: f32,
+    dz: f32,
+    selection: Option<Selection>,
+) -> (u8, u8, u8) {
     if let Some(hit) = raycast(world, ox, oy, oz, dx, dy, dz, FOG_FAR) {
-        let (mut r, mut g, mut b) = hit.block.rgb(hit.face);
         let hx = ox + dx * hit.dist;
         let hy = oy + dy * hit.dist;
         let hz = oz + dz * hit.dist;
@@ -876,12 +991,21 @@ fn sample(world: &World, ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f32) -
             2 | 3 => (hz.fract().abs(), hy.fract().abs()),
             _ => (hx.fract().abs(), hy.fract().abs()),
         };
-        // 8×8 texel noise so faces read as blocks, not flat fills
-        let tex = (((u * 8.0) as i32).wrapping_mul(31) ^ ((v * 8.0) as i32).wrapping_mul(17)) & 7;
-        let delta = tex as i16 - 3;
-        r = (r as i16 + delta).clamp(0, 255) as u8;
-        g = (g as i16 + delta).clamp(0, 255) as u8;
-        b = (b as i16 + delta).clamp(0, 255) as u8;
+        let (mut r, mut g, mut b) = hit.block.texel(hit.face, u, v);
+        if let Some(focus) = selection.filter(|f| (f.x, f.y, f.z) == (hit.x, hit.y, hit.z)) {
+            let edge = !(0.025..=0.975).contains(&u) || !(0.025..=0.975).contains(&v);
+            let tx = (u * 16.0) as i32;
+            let ty = (v * 16.0) as i32;
+            let radius = (focus.damage.clamp(0.0, 1.0) * 15.0) as i32;
+            let crack = radius > 0
+                && (tx - 8).abs().max((ty - 8).abs()) < radius
+                && (tx == 7 + ((ty * 3) ^ ty) % 3 || ty == 4 + tx / 2 || ty == 14 - tx / 2);
+            if edge || crack {
+                r /= 3;
+                g /= 3;
+                b /= 3;
+            }
+        }
         fog(r, g, b, hit.dist)
     } else {
         sky(dy)
@@ -906,5 +1030,217 @@ fn fog(r: u8, g: u8, b: u8, dist: f32) -> (u8, u8, u8) {
         return (r, g, b);
     }
     let t = ((dist - FOG_NEAR) / (FOG_FAR - FOG_NEAR)).clamp(0.0, 1.0);
-    (lerp(r, FOG.0, t), lerp(g, FOG.1, t), lerp(b, FOG.2, t))
+    let haze = sky(0.0);
+    (lerp(r, haze.0, t), lerp(g, haze.1, t), lerp(b, haze.2, t))
+}
+
+#[cfg(test)]
+mod polish_tests {
+    use super::*;
+    use crate::viewmodel::Tool;
+    use std::time::Instant;
+
+    #[test]
+    fn mining_damage_is_attached_to_the_target_not_the_screen() {
+        let mut world = World::generate(42);
+        for x in 19..25 {
+            for y in 19..25 {
+                for z in 19..23 {
+                    world.set(x, y, z, crate::block::Block::Air);
+                }
+            }
+        }
+        world.set(22, 21, 20, crate::block::Block::Slate);
+        let mut idle = vec![0; 128 * 128 * 4];
+        let mut damage = idle.clone();
+        fill_view(
+            &mut idle, 128, 128, &world, 20.5, 21.5, 20.5, 0.0, 0.0, true, 0.0,
+        );
+        fill_view(
+            &mut damage,
+            128,
+            128,
+            &world,
+            20.5,
+            21.5,
+            20.5,
+            0.0,
+            0.0,
+            true,
+            0.8,
+        );
+        assert!(idle.iter().zip(&damage).filter(|(a, b)| a != b).count() > 30);
+        fill_view(
+            &mut idle, 128, 128, &world, 20.5, 21.5, 20.5, 0.0, 0.0, false, 0.0,
+        );
+        fill_view(
+            &mut damage,
+            128,
+            128,
+            &world,
+            20.5,
+            21.5,
+            20.5,
+            0.0,
+            0.0,
+            false,
+            0.8,
+        );
+        assert!(
+            idle == damage,
+            "menu views must not show interactive cracks"
+        );
+    }
+
+    #[test]
+    fn daylight_and_inventory_icons_read_as_materials() {
+        let horizon = sky(0.0);
+        assert!(
+            horizon.2 > horizon.0,
+            "daylight haze must not tint the whole world orange"
+        );
+        assert_eq!(fog(0, 0, 0, FOG_FAR), horizon);
+        let mut image = vec![0; 64 * 64 * 4];
+        block_icon(&mut image, 64, 64, 8, 8, 40, crate::block::Block::Terra);
+        let colors: std::collections::HashSet<_> = image
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .filter(|p| p[3] > 0)
+            .copied()
+            .collect();
+        assert!(
+            colors.len() > 12,
+            "inventory item should be a textured cube, not a solid swatch"
+        );
+    }
+
+    #[test]
+    fn balanced_raster_is_bounded_and_upscales_without_smearing() {
+        assert_eq!(world_extent(1920, 1080, false), (960, 540));
+        assert_eq!(world_extent(720, 648, false), (360, 324));
+        assert_eq!(world_extent(1920, 1080, true), (1920, 1080));
+        let (w, h) = world_extent(721, 649, false);
+        assert!(w <= 960 && h <= 540);
+        let mut rgba = vec![0; 4 * 4 * 4];
+        rgba[..16].copy_from_slice(&[10, 0, 0, 255, 20, 0, 0, 255, 30, 0, 0, 255, 40, 0, 0, 255]);
+        upscale_in_place(&mut rgba, 2, 2, 4, 4);
+        for y in 0..4 {
+            for x in 0..4 {
+                assert_eq!(rgba[(y * 4 + x) * 4], [10, 20, 30, 40][(y / 2) * 2 + x / 2]);
+                assert_eq!(rgba[(y * 4 + x) * 4 + 3], 255);
+            }
+        }
+    }
+
+    #[test]
+    fn rendered_center_matches_the_interaction_ray_at_steep_pitch() {
+        let world = World::generate(42);
+        let (x, y, z) = world.spawn();
+        for pitch in [-1.1_f32, -0.75, 0.4] {
+            let mut rgba = vec![0; 101 * 101 * 4];
+            fill_view(
+                &mut rgba,
+                101,
+                101,
+                &world,
+                x,
+                y + 5.0,
+                z,
+                0.35,
+                pitch,
+                false,
+                0.0,
+            );
+            let expected = sample(
+                &world,
+                x,
+                y + 5.0,
+                z,
+                0.35_f32.cos() * pitch.cos(),
+                pitch.sin(),
+                0.35_f32.sin() * pitch.cos(),
+                None,
+            );
+            let i = (50 * 101 + 50) * 4;
+            assert_eq!(
+                &rgba[i..i + 3],
+                &[expected.0, expected.1, expected.2],
+                "crosshair/raycast diverged at pitch {pitch}"
+            );
+        }
+    }
+
+    #[test]
+    #[ignore = "hardware benchmark, run explicitly in release mode"]
+    fn render_benchmark() {
+        let world = World::generate(42);
+        let mut player = Player::spawn(&world);
+        let inv = Inventory {
+            terra: 64,
+            slate: 32,
+            wood: 16,
+            sand: 8,
+            gem: 4,
+        };
+        let out =
+            std::env::var("TERMINAL_CRAFT_BENCH_OUT").expect("set benchmark output directory");
+        std::fs::create_dir_all(&out).unwrap();
+        let mut records = Vec::new();
+        world
+            .save(
+                &std::path::Path::new(&out).join("world.tcrf"),
+                &inv.pack(),
+                false,
+                0,
+                Some(&crate::world::SaveState {
+                    pose: [player.x, player.y, player.z, 0.35, -0.20],
+                    tool: 2,
+                    flying: false,
+                }),
+            )
+            .unwrap();
+        for (name, altitude, pitch) in [
+            ("ground", 0.0, -0.20),
+            ("vista", 12.0, -0.30),
+            ("downward", 5.0, -0.90),
+        ] {
+            let (_, ground, _) = world.spawn();
+            player.y = ground + altitude;
+            player.pitch = pitch;
+            for (pw, ph) in [(720, 648), (1280, 720), (1920, 1080)] {
+                let mut image = vec![0; (pw * ph * 4) as usize];
+                let mut view = ViewModel::default();
+                view.tool = Tool::Pickaxe;
+                let mut samples = Vec::new();
+                for i in 0..33 {
+                    let begin = Instant::now();
+                    let (x, y, z) = player.eye();
+                    fill_view(&mut image, pw, ph, &world, x, y, z, 0.35, pitch, true, 0.0);
+                    view.advance(1.0 / 60.0, true);
+                    view.draw(&mut image, pw, ph, HOTBAR[0]);
+                    overlay_hud(
+                        &mut image, pw, ph, &world, &player, &inv, 0, false, "", 60, false, false,
+                        view.tool,
+                    );
+                    std::hint::black_box(&image);
+                    if i >= 3 {
+                        samples.push(begin.elapsed().as_secs_f64() * 1000.0);
+                    }
+                }
+                samples.sort_by(f64::total_cmp);
+                records.push(format!("{{\"scene\":\"{name}\",\"width\":{pw},\"height\":{ph},\"frames\":{},\"p50_ms\":{:.4},\"p95_ms\":{:.4},\"max_ms\":{:.4}}}",samples.len(),samples[samples.len()/2],samples[(samples.len()*95).div_ceil(100)-1],samples.last().unwrap()));
+                if pw == 720 {
+                    let mut ppm = format!("P6\n{pw} {ph}\n255\n").into_bytes();
+                    for p in image.as_chunks::<4>().0 {
+                        ppm.extend_from_slice(&p[..3]);
+                    }
+                    std::fs::write(format!("{out}/{name}.ppm"), ppm).unwrap();
+                }
+            }
+        }
+        let report=format!("{{\"scope\":\"CPU world render, hand and HUD; excludes terminal transport, compositor and display\",\"seed\":42,\"warmup_frames\":3,\"results\":[{}]}}",records.join(","));
+        std::fs::write(format!("{out}/report.json"), &report).unwrap();
+        println!("{report}");
+    }
 }

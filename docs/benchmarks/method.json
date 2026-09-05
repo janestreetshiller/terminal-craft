@@ -1,0 +1,9 @@
+{
+  "hardware": "Apple M4",
+  "architecture": "arm64",
+  "candidate": "0.8.1",
+  "baseline": "0.8.0 / 253a88e",
+  "recorded_utc": "2026-09-05T01:10:31.815133+00:00",
+  "conditions": "Short local runs on active desktop; not a controlled lab or display latency test.",
+  "tradeoff": "Balanced world raster capped at 960x540 with nearest-neighbor expansion; hand/HUD remain full-resolution. FOV, materials and camera basis also changed; this is a full-preset comparison, not isolated algorithm speedup."
+}

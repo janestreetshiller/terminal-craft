@@ -12,7 +12,19 @@ is involved in this game.
 The separate browser game is now **Block Craft**, launched by `block-craft` or
 `/Applications/Block Craft.app`. It is not bundled into this repository.
 
-## Native features in 0.8.0
+## Feel and performance in 0.8.1
+
+This release adds a corrected 70-degree camera, procedural material textures,
+target outlines/mining cracks, textured hotbar icons, and eased tool motion.
+Gameplay targets a 60 FPS frame budget. Balanced rendering caps world raster
+work while keeping the hand and HUD at native resolution; use
+`TERMINAL_CRAFT_QUALITY=native terminal-craft` for full-resolution world rendering.
+
+See [the measured polish report](docs/polish.md) for before/after images,
+CPU benchmark results, methodology, limitations and the reproduction command.
+The previous release verification is retained in `docs/verification.md`.
+
+## Native features
 
 - Seeded voxel terrain, trees, six language-themed regions, and resource mining.
 - Visible first-person arm and hand; distinct pickaxe, axe, shovel, and held blocks.

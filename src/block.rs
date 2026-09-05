@@ -1,4 +1,4 @@
-//! Block types, harvest table, craft recipes, and Multiplexerverse palette.
+//! Block types, harvest table, craft recipes, and original procedural material palette.
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
@@ -63,18 +63,19 @@ impl Block {
     pub fn rgb(self, face: u8) -> (u8, u8, u8) {
         let (r, g, b) = match self {
             Self::Air => (70, 99, 155),
-            Self::Terra => (201, 169, 78),
-            Self::Slate => (122, 111, 99),
+            Self::Terra if face == 0 => (110, 151, 76),
+            Self::Terra => (132, 98, 65),
+            Self::Slate => (128, 134, 136),
             Self::Sand => (217, 192, 138),
             Self::Wood => (122, 83, 48),
-            Self::Leaf => (127, 174, 74),
+            Self::Leaf => (97, 145, 76),
             Self::Rust => (176, 100, 56),
             Self::Jungle => (77, 124, 58),
             Self::TsSlate => (111, 127, 149),
-            Self::Ruby => (255, 77, 94),
-            Self::Core => (77, 232, 224),
-            Self::Conduit => (255, 180, 84),
-            Self::Beacon => (255, 180, 84),
+            Self::Ruby => (125, 119, 120),
+            Self::Core => (105, 184, 178),
+            Self::Conduit => (203, 171, 105),
+            Self::Beacon => (225, 207, 150),
         };
         let shade = match face {
             0 => 1.00,
@@ -89,6 +90,40 @@ impl Block {
         )
     }
 
+    /// Original 16x16 procedural pixel materials, shared by world and previews.
+    pub fn texel(self, face: u8, u: f32, v: f32) -> (u8, u8, u8) {
+        let x = (u.clamp(0.0, 0.9999) * 16.0) as i32;
+        let y = (v.clamp(0.0, 0.9999) * 16.0) as i32;
+        let mut hash = (x as u32).wrapping_mul(0x45d9f3b)
+            ^ (y as u32).wrapping_mul(0x119de1f3)
+            ^ (self as u32).wrapping_mul(0x27d4eb2d);
+        hash = (hash ^ (hash >> 16)).wrapping_mul(0x45d9f3b);
+        let noise = ((hash >> 20) & 15) as i16 - 7;
+        let mut color = self.rgb(face);
+        let mut delta = noise;
+        match self {
+            Self::Terra if face > 1 && y >= 13 + (x % 3) => color = (81, 119, 54),
+            Self::Wood if face < 2 => {
+                let ring = (x - 7).abs().max((y - 7).abs());
+                color = (160, 121, 76);
+                delta = if ring % 3 == 0 { -22 } else { noise };
+            }
+            Self::Wood => delta += if (x + (y / 5)) % 4 == 0 { -18 } else { 3 },
+            Self::Slate | Self::TsSlate | Self::Rust => {
+                delta += if (y + x / 5) % 7 == 0 { -8 } else { 2 }
+            }
+            Self::Leaf | Self::Jungle => delta *= 2,
+            Self::Ruby if hash & 7 < 2 => color = (170, 75, 75),
+            Self::Core | Self::Conduit | Self::Beacon if x == 2 || x == 13 || y == 2 || y == 13 => {
+                color = (74, 89, 88);
+                delta = 0;
+            }
+            _ => {}
+        }
+        let shade = |c: u8| (c as i16 + delta).clamp(0, 255) as u8;
+        (shade(color.0), shade(color.1), shade(color.2))
+    }
+
     pub fn harvest(self) -> Option<Res> {
         match self {
             Self::Terra | Self::Jungle => Some(Res::Terra),
@@ -98,6 +133,35 @@ impl Block {
             Self::Ruby => Some(Res::Gem),
             Self::Core | Self::Conduit | Self::Beacon | Self::Air => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod material_tests {
+    use super::*;
+    #[test]
+    fn materials_have_readable_surfaces_not_flat_color_tiles() {
+        let grass = Block::Terra.texel(0, 0.4, 0.4);
+        let dirt = Block::Terra.texel(2, 0.4, 0.3);
+        assert!(
+            grass.1 > grass.0 && grass.1 > grass.2,
+            "grass top must read green"
+        );
+        assert!(
+            dirt.0 > dirt.1 && dirt.1 > dirt.2,
+            "grass sides must read earth"
+        );
+        assert_ne!(
+            Block::Wood.texel(0, 0.2, 0.2),
+            Block::Wood.texel(2, 0.2, 0.2)
+        );
+        let mut colors = std::collections::HashSet::new();
+        for x in 0..16 {
+            for y in 0..16 {
+                colors.insert(Block::Slate.texel(0, x as f32 / 16.0, y as f32 / 16.0));
+            }
+        }
+        assert!(colors.len() > 8, "stone needs restrained texture variation");
     }
 }
 

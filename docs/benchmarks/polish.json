@@ -1,0 +1,88 @@
+{
+  "scope": "CPU world render, hand and HUD; excludes terminal transport, compositor and display",
+  "seed": 42,
+  "warmup_frames": 3,
+  "results": [
+    {
+      "scene": "ground",
+      "width": 720,
+      "height": 648,
+      "frames": 30,
+      "p50_ms": 2.9831,
+      "p95_ms": 3.54,
+      "max_ms": 3.6339
+    },
+    {
+      "scene": "ground",
+      "width": 1280,
+      "height": 720,
+      "frames": 30,
+      "p50_ms": 5.6709,
+      "p95_ms": 6.5796,
+      "max_ms": 6.6137
+    },
+    {
+      "scene": "ground",
+      "width": 1920,
+      "height": 1080,
+      "frames": 30,
+      "p50_ms": 12.419,
+      "p95_ms": 14.1102,
+      "max_ms": 28.7565
+    },
+    {
+      "scene": "vista",
+      "width": 720,
+      "height": 648,
+      "frames": 30,
+      "p50_ms": 3.6498,
+      "p95_ms": 4.1753,
+      "max_ms": 4.2391
+    },
+    {
+      "scene": "vista",
+      "width": 1280,
+      "height": 720,
+      "frames": 30,
+      "p50_ms": 7.167,
+      "p95_ms": 7.6782,
+      "max_ms": 7.7166
+    },
+    {
+      "scene": "vista",
+      "width": 1920,
+      "height": 1080,
+      "frames": 30,
+      "p50_ms": 14.9564,
+      "p95_ms": 16.0812,
+      "max_ms": 16.9522
+    },
+    {
+      "scene": "downward",
+      "width": 720,
+      "height": 648,
+      "frames": 30,
+      "p50_ms": 2.0672,
+      "p95_ms": 2.369,
+      "max_ms": 2.3729
+    },
+    {
+      "scene": "downward",
+      "width": 1280,
+      "height": 720,
+      "frames": 30,
+      "p50_ms": 4.4013,
+      "p95_ms": 4.957,
+      "max_ms": 5.0031
+    },
+    {
+      "scene": "downward",
+      "width": 1920,
+      "height": 1080,
+      "frames": 30,
+      "p50_ms": 9.4393,
+      "p95_ms": 10.1337,
+      "max_ms": 11.0693
+    }
+  ]
+}

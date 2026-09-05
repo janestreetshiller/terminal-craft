@@ -87,7 +87,7 @@ fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("--help" | "-h") => {
-            println!("Terminal Craft {}\nNative Rust voxel sandbox — no browser or server.\n\nterminal-craft             Open a dedicated kitty window\nterminal-craft --here      Play in the current terminal\nterminal-craft --version   Print version\nterminal-craft --check-save PATH   Validate a save without modifying it\n\nWASD move; mouse/arrows look; space jump\nHold LMB or E/F to mine; RMB or Q/Tab to place\n0 hand; 7 pickaxe; 8 axe; 9 shovel; 1-6 held blocks\nH/I controls, inventory and recipes; M map; F3 debug\nC creative; double-space flight; Z descend; R save; Esc save and quit",env!("CARGO_PKG_VERSION"));
+            println!("Terminal Craft {}\nNative Rust voxel sandbox — no browser or server.\n\nterminal-craft             Open a dedicated kitty window\nterminal-craft --here      Play in the current terminal\nterminal-craft --version   Print version\nterminal-craft --check-save PATH   Validate a save without modifying it\n\nWASD move; mouse/arrows look; space jump\nHold LMB or E/F to mine; RMB or Q/Tab to place\n0 hand; 7 pickaxe; 8 axe; 9 shovel; 1-6 held blocks\nH/I controls, inventory and recipes; M map; F3 debug\nC creative; double-space flight; Z descend; R save; Esc save and quit\n\nTERMINAL_CRAFT_QUALITY=native renders the world at full window resolution.\nDefault balanced quality keeps world pixels crisp and bounds rendering cost.",env!("CARGO_PKG_VERSION"));
             return ExitCode::SUCCESS;
         }
         Some("--version" | "-V") => {
