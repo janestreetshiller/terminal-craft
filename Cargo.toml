@@ -1,0 +1,21 @@
+[package]
+name = "tuicraft"
+version = "0.7.0"
+edition = "2021"
+description = "Multiplexerverse voxel sandbox for the terminal"
+license = "LicenseRef-All-Rights-Reserved"
+publish = false
+
+[[bin]]
+name = "tuicraft-game"
+path = "src/main.rs"
+
+[dependencies]
+crossterm = "0.28"
+libc = "0.2"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+strip = "symbols"

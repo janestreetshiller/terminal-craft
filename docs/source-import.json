@@ -1,0 +1,70 @@
+{
+  "source": "/Users/main/Code/omarchy-craft/projects/TUICraft/current",
+  "note": "Complete native source import; no Git metadata existed in the retained source. Original snapshot remains unchanged. Browser sources remain separate.",
+  "files": [
+    {
+      "path": ".gitignore",
+      "sha256": "4f0944189d5358b284a34108aa30a63556e6f5b60ad36482b740159b5399a662"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "668453d198e37bac54a07768cabea6ea0cb2744c282b64722d6d32f8e296dba6"
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "f3f760c862572ca43a1e58fcda4aa3216376f9a22f609252ab8bf29127fd976d"
+    },
+    {
+      "path": "kitty-minigame.conf",
+      "sha256": "ffefedac5d4f2f0747cbdce89bd4be15a077a4fafd4d330583a9fd329677bf0d"
+    },
+    {
+      "path": "src/block.rs",
+      "sha256": "e3f6e4eff1cd5d4a8adb91edac9ae8022be2c369b997d2e8dde2f6e7dd149ccb"
+    },
+    {
+      "path": "src/game.rs",
+      "sha256": "1e655d87ee9968e6dd5605ccb18c00cff5c9e98e10411fcc136baed2c3cbf054"
+    },
+    {
+      "path": "src/kitty/encoder.rs",
+      "sha256": "92fba30318ce91d2984e8aa3eef7ee24c310006a1081cb0dd88310606b9b1a47"
+    },
+    {
+      "path": "src/kitty/metrics.rs",
+      "sha256": "8224d2288b892f5bd730d154779a84ee2f06b6317d1bb981914e0e69e89ce9a5"
+    },
+    {
+      "path": "src/kitty/mod.rs",
+      "sha256": "d552998f9755807b55fed2d54c6400145cf92bc92c691879bff843706e18c064"
+    },
+    {
+      "path": "src/kitty/transport.rs",
+      "sha256": "6b0abcf360238e0e4ff3ad34534dc8888faacea607934d11c390818638c6a344"
+    },
+    {
+      "path": "src/kitty_gfx.rs",
+      "sha256": "682c5cf962386173bb6a975d5cfbbc5033be601d22ad7acc2c40f0fe8b1b9587"
+    },
+    {
+      "path": "src/main.rs",
+      "sha256": "3befb58fc558b49f5565910a258f044bf343a6891e37e047919553c9927adc87"
+    },
+    {
+      "path": "src/menu.rs",
+      "sha256": "fe278a4cd907b6250cc9ecf2bc1b32aace4d0e10b85385d7ccaec96370c91569"
+    },
+    {
+      "path": "src/player.rs",
+      "sha256": "09c5f6782948d0fbf3c1f7e773f60bd97cdc10684e19248d6d5da92016679750"
+    },
+    {
+      "path": "src/render.rs",
+      "sha256": "c0f28e557c93b7ee10e0157d10117de2086d6e3eb998aaa5571f155639bf6207"
+    },
+    {
+      "path": "src/world.rs",
+      "sha256": "284d3f49a5c29f594eacbd9f5ab332a10fbc1d00bbc4beaa4bc7abb1e23e2eac"
+    }
+  ]
+}
