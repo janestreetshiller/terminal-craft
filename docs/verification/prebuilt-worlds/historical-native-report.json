@@ -1,0 +1,140 @@
+{
+  "schema": 1,
+  "scope": "retained historical native map results; not a new run",
+  "overall_suite_timestamp_utc": "2026-09-05T07:55:02.696171+00:00",
+  "overall_suite_passed": false,
+  "release_sha256": "adfe1edb9aed8c7d6102919e9f774fe0eb158fc4270a829608e2de74e0cf5320",
+  "installed_sha256": "adfe1edb9aed8c7d6102919e9f774fe0eb158fc4270a829608e2de74e0cf5320",
+  "installed_matches_release": true,
+  "current_repaired_source_binding": "not established by these historical reports",
+  "map_runs": {
+    "release": {
+      "retained_evidence_sha256": "7aa316f3e9c49fe987d7f278ddcc99a31b557cc491d334600e74250a2ecfc659",
+      "result": {
+        "passed": true,
+        "map_count": 5,
+        "default_world_unchanged": true,
+        "pointer_released_on_exit": true,
+        "maps": [
+          {
+            "id": "foundry",
+            "passed": true,
+            "walk_distance": 1.7916679,
+            "jump": true,
+            "placed_one_block": true,
+            "save_reload_pose": true,
+            "edit_retained": true,
+            "pointer_locked": true
+          },
+          {
+            "id": "switchyard",
+            "passed": true,
+            "walk_distance": 1.7916679,
+            "jump": true,
+            "placed_one_block": true,
+            "save_reload_pose": true,
+            "edit_retained": true,
+            "pointer_locked": true
+          },
+          {
+            "id": "citadel",
+            "passed": true,
+            "walk_distance": 1.7916679,
+            "jump": true,
+            "placed_one_block": true,
+            "save_reload_pose": true,
+            "edit_retained": true,
+            "pointer_locked": true
+          },
+          {
+            "id": "skybridge",
+            "passed": true,
+            "walk_distance": 1.7916679,
+            "jump": true,
+            "placed_one_block": true,
+            "save_reload_pose": true,
+            "edit_retained": true,
+            "pointer_locked": true
+          },
+          {
+            "id": "dune-outpost",
+            "passed": true,
+            "walk_distance": 1.7916679,
+            "jump": true,
+            "placed_one_block": true,
+            "save_reload_pose": true,
+            "edit_retained": true,
+            "pointer_locked": true
+          }
+        ]
+      }
+    },
+    "installed": {
+      "retained_evidence_sha256": "7aa316f3e9c49fe987d7f278ddcc99a31b557cc491d334600e74250a2ecfc659",
+      "result": {
+        "passed": true,
+        "map_count": 5,
+        "default_world_unchanged": true,
+        "pointer_released_on_exit": true,
+        "maps": [
+          {
+            "id": "foundry",
+            "passed": true,
+            "walk_distance": 1.7916679,
+            "jump": true,
+            "placed_one_block": true,
+            "save_reload_pose": true,
+            "edit_retained": true,
+            "pointer_locked": true
+          },
+          {
+            "id": "switchyard",
+            "passed": true,
+            "walk_distance": 1.7916679,
+            "jump": true,
+            "placed_one_block": true,
+            "save_reload_pose": true,
+            "edit_retained": true,
+            "pointer_locked": true
+          },
+          {
+            "id": "citadel",
+            "passed": true,
+            "walk_distance": 1.7916679,
+            "jump": true,
+            "placed_one_block": true,
+            "save_reload_pose": true,
+            "edit_retained": true,
+            "pointer_locked": true
+          },
+          {
+            "id": "skybridge",
+            "passed": true,
+            "walk_distance": 1.7916679,
+            "jump": true,
+            "placed_one_block": true,
+            "save_reload_pose": true,
+            "edit_retained": true,
+            "pointer_locked": true
+          },
+          {
+            "id": "dune-outpost",
+            "passed": true,
+            "walk_distance": 1.7916679,
+            "jump": true,
+            "placed_one_block": true,
+            "save_reload_pose": true,
+            "edit_retained": true,
+            "pointer_locked": true
+          }
+        ]
+      }
+    }
+  },
+  "notes": [
+    "Both five-map checks passed; the overall suite did not.",
+    "The overall suite failed its installed default-theme native motion test after focus was lost before movement checks.",
+    "No machine-specific paths, screenshots, user saves or credentials are included.",
+    "Retained evidence is preserved separately from the newer source-only report."
+  ]
+}

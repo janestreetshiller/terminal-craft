@@ -92,11 +92,15 @@ replace existing files. Private PTY tests select, move, save and directly resume
 all five maps without replacing the base world. The Rust tests cover isolated
 map saves and error handling.
 
-Native QA exists in `tests/test_prebuilt_native.py` and
-`tests/test_native_window.py`, but requires explicit exclusive GUI approval.
-It captures the pointer and exercises focus/fullscreen. A retained September 5,
-2026 full-suite run failed the installed app's default-theme native motion check;
-passing map-specific reports do not supersede that failure. No current all-pass
+The [retained native map reports](verification/prebuilt-worlds/historical-native-report.json)
+record successful five-map checks for both the release and installed binaries.
+A separate September 5, 2026 full-suite run failed the installed app's default-theme
+native motion check after focus was lost. Both outcomes are documented rather
+than treating all native testing as absent or all tests as passing.
+
+For future reruns, `tests/test_prebuilt_native.py` and
+`tests/test_native_window.py` require exclusive GUI coordination: they capture
+the pointer and exercise focus/fullscreen. No rerun is needed for documentation. No current all-pass
 native/installed or visual claim is made. Screenshots will be added only after
 real, source-bound capture and review; missing placeholder links were removed.
 

@@ -194,6 +194,12 @@ Rust snapshot had no Git metadata; commit `77e60e9` preserves the unmodified imp
 `~/Code/omarchy-craft/projects/TUICraft/current` is a retained historical snapshot,
 not another active native checkout. Existing Git history was preserved.
 
+## Documentation
+
+[Documentation index](docs/README.md): map usage, troubleshooting, current and
+historical test evidence, provenance, and publication drafts. Existing licensing
+policy is unchanged; any policy change is deferred to the owner.
+
 ## Public launch
 
 - [Final pre-publication verification](docs/public-launch-verification.md)

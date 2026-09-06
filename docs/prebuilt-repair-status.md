@@ -4,6 +4,9 @@ This page separates source repairs from publication and installed-app approval.
 It is not a release announcement. The repository's all-rights-reserved terms
 remain unchanged; `LICENSE` now records them explicitly. Import hashes and the
 reproducible map generator preserve provenance, not a new third-party rights grant.
+The owner has deferred any licensing-policy change; existing policy is left as
+is. This is not a blocker for completing the documentation. See the
+[documentation index](README.md) for usage, troubleshooting and all test records.
 
 ## Source repairs
 
@@ -42,18 +45,28 @@ the assertion now compares canonical paths, and the fresh full source run passed
 The three CLI aliases were repaired with timestamped backups and each passed
 `--help` under a minimal shell environment. The installed binary was not changed.
 
-## Native failure diagnosis and remaining gates
+## Historical native testing and its limits
 
-The retained September 5, 2026 full-suite run failed installed default-theme
+Native testing **was already performed**. The retained
+[five-map native results](verification/prebuilt-worlds/historical-native-report.json)
+passed for both the release and installed binaries: every map checked walking,
+jumping, placement, save/reload, retained edits and pointer lock/release while
+preserving the base world. Those successes remain valid historical evidence.
+
+Separately, the retained September 5, 2026 full-suite run failed installed default-theme
 native motion: no walking/turning/jump and no pointer lock. Its SDL event trace
 records **FocusLost at frame 1**, before the scripted game selection at frame 6;
 focus was not regained until frame 53, after the movement checks. This explains
 why the early actions had no effect, but does not identify which external app
 or operator took focus. Do not weaken focus-loss safety or count that run as a
-pass. Coordinate exclusive GUI ownership, rerun the native and installed suites,
-and review actual gameplay/picker screenshots before claiming closure.
+pass. This does not invalidate the successful map-specific runs or require
+repeating tests merely to finish documentation. A new all-pass installed/native
+claim would require a fresh, source-bound run and any claimed screenshot review.
 
-Outstanding owner gates:
+## Separate runtime and distribution work
+
+The following are outside the documentation closeout, not prerequisites for
+writing or committing these docs:
 
 1. Exclusive desktop/app time for native QA and visual review; no automated
    pointer capture until approved. `python3 scripts/verify.py --gui` provides a
@@ -61,12 +74,11 @@ Outstanding owner gates:
 2. Installed build/source binding: the retained 0.10.0 binary has no complete
    contemporaneous source manifest. Approve a tested install and verify its new
    manifest/signature before asserting it corresponds to the repaired source.
-3. Owner confirmation of imported-work/map rights and desired release scope.
-   All rights reserved is not an open-source grant; dependencies keep their terms.
-4. Explicit push permission, then successful hosted CI for the exact pushed
+3. Explicit push permission, then successful hosted CI for the exact pushed
    commit. No 0.10.0 tag, GitHub Release, downloadable app/map archive, notarization
    or social posting is asserted or authorized by a local commit alone.
 
-A successful source-only verifier report is useful evidence, not completion of
-these gates. Hard-link export requires a supporting destination filesystem;
+Licensing changes are deferred to the owner and are not part of this work.
+A successful source-only verifier report does not certify the separate runtime
+or distribution actions above. Hard-link export requires a supporting destination filesystem;
 unsupported filesystems fail safely instead of using an overwrite fallback.
