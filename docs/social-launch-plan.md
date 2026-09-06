@@ -5,7 +5,14 @@ Status: **drafts only — not posted, not scheduled**. Day 1 means the day the o
 
 Repository: https://github.com/janestreetshiller/terminal-craft
 
-## Positioning and claim boundaries
+## Candidate, not a release announcement
+
+The [0.10.0 five-world drafts](social-prebuilt-worlds.md) are unapproved candidate
+copy. Follow the [repair/release gates](prebuilt-repair-status.md) before posting.
+The v0.9.0 copy and test counts below are retained as historical drafts, not
+current launch claims. The seven-day schedule remains optional guidance.
+
+## Historical v0.9.0 positioning and claim boundaries
 
 Native Rust voxel sandbox, v0.9.0: an SDL window with pointer-locked mouse look, plus optional Kitty graphics/ANSI terminal rendering, sharing one game engine and save format. Mine, place blocks, switch tools, fly in creative mode, and save worlds. No browser or Node runtime.
 

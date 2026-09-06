@@ -1,0 +1,147 @@
+[
+  {
+    "id": "foundry",
+    "title": "Foundry",
+    "description": "Refinery tower, tanks and service yard",
+    "origin": "original",
+    "author": "janestreetshiller",
+    "sha256": "35414a4f2b9624b810de954b6b96d71f4b03765705b28218b17783028d4bb964",
+    "spawn": [
+      12.5,
+      4.001,
+      48.5,
+      0.0,
+      0.12
+    ],
+    "structure_blocks": 5652,
+    "walkable_reachable_cells": 8936,
+    "checked_landmarks": [
+      [
+        44,
+        25,
+        42
+      ],
+      [
+        24,
+        4,
+        71
+      ]
+    ]
+  },
+  {
+    "id": "switchyard",
+    "title": "Switchyard",
+    "description": "Freight cars, rail lanes and signal gantry",
+    "origin": "original",
+    "author": "janestreetshiller",
+    "sha256": "067e2a8130d5719090079cdbe475a892f94b9645f0c4452d1463e1c5bd05e5ee",
+    "spawn": [
+      10.5,
+      4.001,
+      48.5,
+      0.0,
+      0.08
+    ],
+    "structure_blocks": 4684,
+    "walkable_reachable_cells": 9112,
+    "checked_landmarks": [
+      [
+        50,
+        19,
+        48
+      ],
+      [
+        84,
+        4,
+        23
+      ]
+    ]
+  },
+  {
+    "id": "citadel",
+    "title": "Citadel",
+    "description": "Stone keep, gate passages and ramparts",
+    "origin": "original",
+    "author": "janestreetshiller",
+    "sha256": "01f61e55d4a615e363796c4b68e2e7f935508823283fa3eecc971e3059ab98aa",
+    "spawn": [
+      12.5,
+      4.001,
+      48.5,
+      0.0,
+      0.09
+    ],
+    "structure_blocks": 10097,
+    "walkable_reachable_cells": 8438,
+    "checked_landmarks": [
+      [
+        30,
+        4,
+        48
+      ],
+      [
+        63,
+        12,
+        73
+      ]
+    ]
+  },
+  {
+    "id": "skybridge",
+    "title": "Skybridge",
+    "description": "Elevated walkways and four satellite pavilions",
+    "origin": "original",
+    "author": "janestreetshiller",
+    "sha256": "45b746ac79fb70c840d21c24a33c56b51971db0af878881d16d97f1f2085a911",
+    "spawn": [
+      12.5,
+      15.001,
+      48.5,
+      0.0,
+      0.08
+    ],
+    "structure_blocks": 7161,
+    "walkable_reachable_cells": 11750,
+    "checked_landmarks": [
+      [
+        48,
+        15,
+        48
+      ],
+      [
+        48,
+        15,
+        20
+      ]
+    ]
+  },
+  {
+    "id": "dune-outpost",
+    "title": "Dune Outpost",
+    "description": "Desert courtyards, rooftops and watchtower",
+    "origin": "original",
+    "author": "janestreetshiller",
+    "sha256": "a1c0b12803804e83dff7e74f19a14aaa41f0d5b711f8af521183729b79c5ddd5",
+    "spawn": [
+      12.5,
+      4.001,
+      48.5,
+      0.0,
+      0.1
+    ],
+    "structure_blocks": 7533,
+    "walkable_reachable_cells": 10107,
+    "checked_landmarks": [
+      [
+        20,
+        4,
+        48
+      ],
+      [
+        45,
+        4,
+        70
+      ]
+    ]
+  }
+]

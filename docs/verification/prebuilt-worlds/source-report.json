@@ -1,0 +1,145 @@
+{
+  "schema": 1,
+  "timestamp_utc": "2026-09-06T04:28:05.763095+00:00",
+  "scope": "source-only; GUI and installed checks skipped",
+  "source_unchanged": true,
+  "snapshot_inputs_unchanged": true,
+  "passed": true,
+  "release_ready": false,
+  "binary_sha256": "ecf06fc791357d39253dcbdb8f8d5877ee64f86849675f279947807ded400268",
+  "tested_build_and_test_inputs_sha256": {
+    ".cargo/config.toml": "7521b13ac90c07071a9dc8a2bbd2ec944688e37c64d1901fab67a3e30a08c6e5",
+    ".github/workflows/ci.yml": "814443160b5ba2b34efbdc7502ee22194a2d983ac002b2db08f1f0e2f63500d5",
+    ".gitignore": "47ce9b981d89dedc64181aec906911f6337bb1d9732ac1c7660a6fef58505d8c",
+    "Cargo.lock": "6841da5b3f49c21c998090925996f79738c4c4591ef9c90a4f881c2ee04cdf05",
+    "Cargo.toml": "47f7024c3fac0a619602b6a59bf71725cdcfaf778571b107e61302773818be8a",
+    "LICENSE": "71afe65ddaaa851ec5e3b6ccd5db54ca0432f8d32ce883164f71002eb60f9c75",
+    "assets/maps/README.md": "0dc1d9946304a6bcce9e80ed631f162dedc359b640d8b21663ff7559d2891c77",
+    "assets/maps/catalog.json": "5798a370fbce97fe529cce6791def0d98c043243a443cfd014fac181790c5ee0",
+    "assets/maps/citadel.tcrf": "01f61e55d4a615e363796c4b68e2e7f935508823283fa3eecc971e3059ab98aa",
+    "assets/maps/dune-outpost.tcrf": "a1c0b12803804e83dff7e74f19a14aaa41f0d5b711f8af521183729b79c5ddd5",
+    "assets/maps/foundry.tcrf": "35414a4f2b9624b810de954b6b96d71f4b03765705b28218b17783028d4bb964",
+    "assets/maps/skybridge.tcrf": "45b746ac79fb70c840d21c24a33c56b51971db0af878881d16d97f1f2085a911",
+    "assets/maps/switchyard.tcrf": "067e2a8130d5719090079cdbe475a892f94b9645f0c4452d1463e1c5bd05e5ee",
+    "bin/terminal-craft": "4a5bbd0fc1696caf51a77fee9d5120d4cd74ead3adf0db0c44b87fd43361594b",
+    "kitty-minigame.conf": "13a9b7f930198ee08eaadc11f85e304055ceb656388baa267e7dd0c6da3f9375",
+    "scripts/build_maps.py": "2576136e1885e5a879249758ceea68463c303cd9c23b2fafe5eab8baaae3bde2",
+    "scripts/install_macos.py": "19c1859abdba84f4d0a669c4c2729ecd277c425de2c9883fd532fb45ccf89e8b",
+    "scripts/package_files.py": "873edd471e301118525f18f3c0330aa3525e6979d7f146cdcdc2cc8071381b40",
+    "scripts/repair_cli_links.py": "d2c8d9797d76975c74821bd9efc80ac3249ad14ce5707f68551c966bb9b64570",
+    "scripts/stress_terminal_session.py": "a39a0868eb908468f77f51f9db7f51ff82cb46a8e60ab4f4213af8664c850a5d",
+    "scripts/verify.py": "64f222777efa19d7ccdf9e85680d80c86195f5d25f6976ecd67967a9d221e0e9",
+    "src/block.rs": "4ed70d08164be5d670f692aac3439f3e29749a5b697135b2b97f3eb6ae6f4f96",
+    "src/config.rs": "05e06843f476963f259007118f98d9b14bd5fd80286e9e7200177765ed7e156c",
+    "src/game.rs": "09708d134bf5f32ecd9d3c16db93bbdb5e0d078f92d40a6005bef7717f5ba47f",
+    "src/kitty/encoder.rs": "dcc32c36703f3b3ac91bc517538a71e938043a655a45d67fe9265f979b596092",
+    "src/kitty/metrics.rs": "0772220e10058786d4bf2e432dac062f4a59f0823d0f921ebdeccc0513935ff4",
+    "src/kitty/mod.rs": "d552998f9755807b55fed2d54c6400145cf92bc92c691879bff843706e18c064",
+    "src/kitty/transport.rs": "6b0abcf360238e0e4ff3ad34534dc8888faacea607934d11c390818638c6a344",
+    "src/kitty_gfx.rs": "6615251a5f86a8e98135040dab2e6c2640a4e01075e55ab942d35bd4c0e95dca",
+    "src/main.rs": "be03282e55096f0d284343835f35f0e91caa05816b4b919f9626d82f73c002c9",
+    "src/maps.rs": "aa545585d6a9cf04a9241be761f98d6df59ea0f8d344c522f76d053ba1b01af7",
+    "src/menu.rs": "3b44a68eb99d101bf177baf9e9542ca7cd5f4c14c009c1c739af59c779451382",
+    "src/native.rs": "8c58bc586602312e3436664cdee35f7c84c0ac329a00fd37ed930dfb5aa5da62",
+    "src/pack_smoke.rs": "8910b48290673c1be72a84ec4e9e58af2e0cea08066a5cbff724f94df877ca97",
+    "src/player.rs": "05c4b880bd520c88ae749a87e4e97d485fe61ec4f8621d9ad68840d77bff0b6a",
+    "src/render.rs": "dd44a00472741e2b3e401cf35fa856bcae82753a36dbd33ce7a095424ba2881c",
+    "src/ui.rs": "7470c2ad1ae07dd37dc51a29706e7191b296dd2878b52e9e9c5e9d82439346d6",
+    "src/viewmodel.rs": "2ab0344af10f619ed645cb93124e691824a2369b9944bcce76d18270f2d92549",
+    "src/world.rs": "92948b99abbe2baef797ba197ea1883235d44d967640deb92d50628da12570c6",
+    "tests/test_install.py": "99508d7b37df961e9694a4d42deff6230f374bd65f5b5781329b361012ee7e43",
+    "tests/test_native_window.py": "34c09954ead9ed3f5c934c258c255c37358105f9e84adc9b9c9ce289814962d2",
+    "tests/test_package_files.py": "b06861ec9eb4b9ea85fb3f4c0362d410f463805b4f966791c9ebd992449d57b3",
+    "tests/test_prebuilt_assets.py": "90d2aa7771f1b11378d7889b7b44b04d5d8038690366fb9d11f9694cb0e1ecd7",
+    "tests/test_prebuilt_cli.py": "c28a73b764fcd0124b22c26b5827ff8747d587955542242ede748c1be9e75067",
+    "tests/test_prebuilt_native.py": "d194d420a2284dd3e4131693d8019f872b339649193ad568614f0232211d47e9",
+    "tests/test_prebuilt_terminal.py": "39e3e653e338d39988b4b99d5f6185da2522d0f615d4cb859842f3457773e78c",
+    "tests/test_repair_cli_links.py": "806617f222c6e5b573e01cc7122d020c990b3597af106802db709f4ccb9a1c74",
+    "tests/test_source_contract.py": "aa63d09e68ee90e63074de2f25a768501190e7701a685cab9c27fe540d581171",
+    "tests/test_terminal_session.py": "ba4f4f997987542f0dc290f1a2b2a86c9b5124c8d2598d2b601a5ff77af4f312",
+    "tests/test_ui_mode.py": "eaae12d5e6e98cb3d222c467f72c7e277104bd157c1db7732a7d02700daf0c15"
+  },
+  "results": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--check"
+      ],
+      "exit_code": 0,
+      "retained_local_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "retained_local_log_sha256": "5e6656ec5a2bc765cd4e97f93939eb0ef964cd2960a312cc22d7df6c3f897b90"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "rust_passed": 46,
+      "rust_failed": 0,
+      "rust_ignored": 1,
+      "retained_local_log_sha256": "ff6a2c5461f1c4f0b870be57435e83448794545374307c1a192c124bbfbf454d"
+    },
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--offline",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "retained_local_log_sha256": "024f7e729c2e917e10cc4508bbb374e4142ccd3dcafbd0f8cb9457a2876bf938"
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "exit_code": 0,
+      "python_run": 24,
+      "python_skipped": 3,
+      "retained_local_log_sha256": "31d88eaf7a10355ecbda377f45658ba2cbb82632d5a0a742fbd2a89a7cbe366e"
+    },
+    {
+      "command": [
+        "python3",
+        "scripts/stress_terminal_session.py"
+      ],
+      "exit_code": 0,
+      "python_run": 4,
+      "python_skipped": 0,
+      "retained_local_log_sha256": "cb869ccb616089881615f87fb48541c3f946de1601356d6fd39ae4328139b29f"
+    }
+  ],
+  "notes": [
+    "46 Rust tests passed; one hardware benchmark ignored.",
+    "21 of 24 Python discovery tests passed; native and installed checks explicitly skipped (3).",
+    "Four existing PTY tests also passed under deliberate child-only descheduling.",
+    "Evidence documentation added after this source snapshot; documentation contracts rechecked separately.",
+    "Local logs are not uploaded; hashes identify retained logs without exposing machine paths.",
+    "An earlier repair attempt failed a macOS /var versus /private/var test-path assertion; canonical-path comparison corrected it.",
+    "No new installed runtime, visual, hosted CI, rights or publication approval is claimed."
+  ]
+}

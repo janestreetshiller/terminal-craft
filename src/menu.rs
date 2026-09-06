@@ -21,6 +21,9 @@ enum Action {
     Continue,
     NewMap,
     Creative,
+    Gallery,
+    Prebuilt(usize),
+    Back,
     Quit,
 }
 
@@ -37,6 +40,8 @@ struct Btn {
 pub fn run(out: &mut impl Write, save_path: &Path) -> io::Result<Option<Game>> {
     let has_save = save_path.exists();
     let mut selected: usize = if has_save { 0 } else { 1 };
+    let mut gallery = false;
+    let mut previous_gallery = false;
     let world = World::generate(seed_now() ^ 0x51A7);
     let mut presenter = Presenter::new();
     let mut rgba = Vec::new();
@@ -45,6 +50,10 @@ pub fn run(out: &mut impl Write, save_path: &Path) -> io::Result<Option<Game>> {
     let pixels = crate::kitty_gfx::available();
 
     loop {
+        if gallery != previous_gallery {
+            selected = if gallery { 0 } else { 3 };
+            previous_gallery = gallery;
+        }
         let (cols, rows) = terminal::size()?;
         let metrics = term_metrics(cols, rows);
         let dt = last.elapsed().as_secs_f32().min(0.05);
@@ -68,8 +77,8 @@ pub fn run(out: &mut impl Write, save_path: &Path) -> io::Result<Option<Game>> {
                 &mut rgba, pw, ph, &world, ox, oy, oz, yaw, pitch, false, 0.0,
             );
             darken_bottom(&mut rgba, pw, ph, 0.42, 0.55);
-            let btns = layout_buttons(has_save, pw, ph);
-            overlay_chrome(&mut rgba, pw, ph, selected, &btns);
+            let btns = layout_buttons(has_save, pw, ph, gallery);
+            overlay_chrome(&mut rgba, pw, ph, selected, &btns, gallery);
             let mut tmp = Vec::new();
             let _ = presenter.present(&mut tmp, &rgba, pw as u32, ph as u32);
             out.write_all(b"\x1b[?25l\x1b[H")?;
@@ -77,9 +86,9 @@ pub fn run(out: &mut impl Write, save_path: &Path) -> io::Result<Option<Game>> {
             out.flush()?;
             if let Some(g) = pump(
                 save_path,
-                has_save,
                 &btns,
                 &mut selected,
+                &mut gallery,
                 metrics.cell_w,
                 metrics.cell_h,
                 cols,
@@ -89,7 +98,14 @@ pub fn run(out: &mut impl Write, save_path: &Path) -> io::Result<Option<Game>> {
             }
         } else {
             // half-block fallback still uses the world, not a dirt field
-            let frame_btns = layout_buttons(has_save, cols as i32 * 8, rows as i32 * 16);
+            let mut frame_btns =
+                layout_buttons(has_save, cols as i32 * 8, rows as i32 * 16, gallery);
+            for (i, b) in frame_btns.iter_mut().enumerate() {
+                b.x = (cols.saturating_sub(28) / 2) as i32 * 8;
+                b.y = (9 + i as i32 * 2) * 16;
+                b.w = 28 * 8;
+                b.h = 16;
+            }
             paint_half(
                 out,
                 cols,
@@ -102,12 +118,13 @@ pub fn run(out: &mut impl Write, save_path: &Path) -> io::Result<Option<Game>> {
                 pitch,
                 selected,
                 &frame_btns,
+                gallery,
             )?;
             if let Some(g) = pump(
                 save_path,
-                has_save,
                 &frame_btns,
                 &mut selected,
+                &mut gallery,
                 8,
                 16,
                 cols,
@@ -119,56 +136,51 @@ pub fn run(out: &mut impl Write, save_path: &Path) -> io::Result<Option<Game>> {
     }
 }
 
-fn layout_buttons(has_save: bool, pw: i32, ph: i32) -> [Btn; 4] {
+fn layout_buttons(has_save: bool, pw: i32, ph: i32, gallery: bool) -> Vec<Btn> {
     let scale = (ph as f32 / 720.0).clamp(0.6, 1.5);
-    let bw = (280.0 * scale) as i32;
-    let bh = (36.0 * scale) as i32;
-    let gap = (10.0 * scale) as i32;
-    let x = (pw - bw) / 2;
-    let y0 = (ph as f32 * 0.58) as i32;
-    [
-        Btn {
-            action: Action::Continue,
-            label: "CONTINUE",
-            enabled: has_save,
-            x,
-            y: y0,
+    let (bw, bh, gap) = (
+        (280.0 * scale) as i32,
+        (36.0 * scale) as i32,
+        (10.0 * scale) as i32,
+    );
+    let rows: Vec<(Action, &str)> = if gallery {
+        crate::maps::MAPS
+            .iter()
+            .enumerate()
+            .map(|(i, m)| (Action::Prebuilt(i), m.title))
+            .chain(std::iter::once((Action::Back, "BACK")))
+            .collect()
+    } else {
+        vec![
+            (Action::Continue, "CONTINUE"),
+            (Action::NewMap, "NEW MAP"),
+            (Action::Creative, "CREATIVE"),
+            (Action::Gallery, "PREBUILT WORLDS"),
+            (Action::Quit, "QUIT GAME"),
+        ]
+    };
+    let y0 = ph / 2 - (rows.len() as i32 * (bh + gap) - gap) / 2 + (ph as f32 * 0.15) as i32;
+    rows.into_iter()
+        .enumerate()
+        .map(|(i, (action, label))| Btn {
+            action,
+            label,
+            enabled: action != Action::Continue || has_save,
+            x: (pw - bw) / 2,
+            y: y0 + i as i32 * (bh + gap),
             w: bw,
             h: bh,
-        },
-        Btn {
-            action: Action::NewMap,
-            label: "NEW MAP",
-            enabled: true,
-            x,
-            y: y0 + bh + gap,
-            w: bw,
-            h: bh,
-        },
-        Btn {
-            action: Action::Creative,
-            label: "CREATIVE",
-            enabled: true,
-            x,
-            y: y0 + (bh + gap) * 2,
-            w: bw,
-            h: bh,
-        },
-        Btn {
-            action: Action::Quit,
-            label: "QUIT GAME",
-            enabled: true,
-            x,
-            y: y0 + (bh + gap) * 3,
-            w: bw,
-            h: bh,
-        },
-    ]
+        })
+        .collect()
 }
 
-fn overlay_chrome(rgba: &mut [u8], pw: i32, ph: i32, selected: usize, btns: &[Btn; 4]) {
+fn overlay_chrome(rgba: &mut [u8], pw: i32, ph: i32, selected: usize, btns: &[Btn], gallery: bool) {
     let scale = (ph as f32 / 720.0).clamp(0.6, 1.5);
-    let title = "TERMINAL CRAFT";
+    let title = if gallery {
+        "PREBUILT WORLDS"
+    } else {
+        "TERMINAL CRAFT"
+    };
     let title_s = (scale * 5.2)
         .min((pw - 32) as f32 / (title.len() as f32 * 6.0))
         .floor()
@@ -259,7 +271,8 @@ fn paint_half(
     yaw: f32,
     pitch: f32,
     selected: usize,
-    _btns: &[Btn; 4],
+    btns: &[Btn],
+    gallery: bool,
 ) -> io::Result<()> {
     let pw = cols as i32;
     let ph = rows as i32 * 2;
@@ -291,11 +304,17 @@ fn paint_half(
     use std::fmt::Write as _;
     let mut chrome = String::new();
     let center = (cols as usize).saturating_sub(28) / 2 + 1;
-    let _ = write!(chrome, "\x1b[3;{}H\x1b[1;33;40mTERMINAL CRAFT", center);
-    for (i, label) in ["CONTINUE", "NEW MAP", "CREATIVE", "QUIT GAME"]
-        .iter()
-        .enumerate()
-    {
+    let _ = write!(
+        chrome,
+        "\x1b[3;{}H\x1b[1;33;40m{}",
+        center,
+        if gallery {
+            "PREBUILT WORLDS"
+        } else {
+            "TERMINAL CRAFT"
+        }
+    );
+    for (i, button) in btns.iter().enumerate() {
         let _ = write!(
             chrome,
             "\x1b[{};{}H\x1b[{}m {} {} ",
@@ -303,7 +322,7 @@ fn paint_half(
             center,
             if i == selected { "1;30;43" } else { "0;37;40" },
             if i == selected { ">" } else { " " },
-            label
+            button.label
         );
     }
     let _ = write!(
@@ -319,9 +338,9 @@ fn paint_half(
 
 fn pump(
     save_path: &Path,
-    has_save: bool,
-    btns: &[Btn; 4],
+    btns: &[Btn],
     selected: &mut usize,
+    gallery: &mut bool,
     cell_w: u16,
     cell_h: u16,
     cols: u16,
@@ -344,7 +363,14 @@ fn pump(
                 }
                 Ok(None)
             }
-            KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => Ok(Some(None)),
+            KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => {
+                if *gallery {
+                    *gallery = false;
+                    Ok(None)
+                } else {
+                    Ok(Some(None))
+                }
+            }
             KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
                 *selected = prev_enabled(*selected, btns);
                 Ok(None)
@@ -353,18 +379,16 @@ fn pump(
                 *selected = next_enabled(*selected, btns);
                 Ok(None)
             }
-            KeyCode::Enter | KeyCode::Char(' ') => activate(btns[*selected].action, save_path),
-            KeyCode::Char('1') if has_save => Ok(Some(Some(Game::load(save_path)?))),
-            KeyCode::Char('1') | KeyCode::Char('2') => Ok(Some(Some(Game::new_map(
-                seed_now(),
-                false,
-                save_path.to_path_buf(),
-            )))),
-            KeyCode::Char('3') => Ok(Some(Some(Game::new_map(
-                seed_now(),
-                true,
-                save_path.to_path_buf(),
-            )))),
+            KeyCode::Enter | KeyCode::Char(' ') => {
+                activate(btns[*selected].action, save_path, gallery)
+            }
+            KeyCode::Char(c @ '1'..='6') => {
+                if let Some(button) = btns.get(c as usize - '1' as usize).filter(|b| b.enabled) {
+                    activate(button.action, save_path, gallery)
+                } else {
+                    Ok(None)
+                }
+            }
             _ => Ok(None),
         },
         Event::Mouse(m) => {
@@ -374,7 +398,7 @@ fn pump(
             }) {
                 *selected = i;
                 if matches!(m.kind, MouseEventKind::Down(MouseButton::Left)) {
-                    return activate(btns[i].action, save_path);
+                    return activate(btns[i].action, save_path, gallery);
                 }
             }
             Ok(None)
@@ -391,7 +415,11 @@ fn mouse_px(col: u16, row: u16, cell_w: u16, cell_h: u16, _cols: u16, _rows: u16
     }
 }
 
-fn activate(action: Action, save_path: &Path) -> io::Result<Option<Option<Game>>> {
+fn activate(
+    action: Action,
+    save_path: &Path,
+    gallery: &mut bool,
+) -> io::Result<Option<Option<Game>>> {
     Ok(match action {
         Action::Continue if save_path.exists() => Some(Some(Game::load(save_path)?)),
         Action::Continue => None,
@@ -405,6 +433,18 @@ fn activate(action: Action, save_path: &Path) -> io::Result<Option<Option<Game>>
             true,
             save_path.to_path_buf(),
         ))),
+        Action::Gallery => {
+            *gallery = true;
+            None
+        }
+        Action::Back => {
+            *gallery = false;
+            None
+        }
+        Action::Prebuilt(index) => Some(Some(crate::maps::open(
+            save_path,
+            crate::maps::MAPS[index].id,
+        )?)),
         Action::Quit => Some(None),
     })
 }

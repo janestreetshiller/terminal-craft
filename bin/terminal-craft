@@ -32,4 +32,4 @@ fi
 exec "$KITTY" --detach --title "Terminal Craft — Terminal Mode" --config "$CONF" \
   --override remember_window_size=no --override confirm_os_window_close=0 \
   --override macos_quit_when_last_window_closed=yes \
-  --override shell_integration=disabled --directory "$HOME" -e "$GAME" --here
+  --override shell_integration=disabled --directory "$HOME" -e "$GAME" --here "$@"

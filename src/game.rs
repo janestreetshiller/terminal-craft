@@ -239,7 +239,7 @@ impl Game {
         )
     }
 
-    fn toast(&mut self, s: &str) {
+    pub(crate) fn toast(&mut self, s: &str) {
         self.toast = s.to_string();
         self.toast_until = Instant::now() + Duration::from_millis(1400);
     }

@@ -20,6 +20,18 @@ those terms.
 The separate browser game is **Block Craft**, launched by `block-craft` or
 `/Applications/Block Craft.app`. It is not bundled into this repository.
 
+## Five prebuilt worlds — 0.10.0 source candidate
+
+Choose **Prebuilt worlds** from the main menu: **Foundry**, **Switchyard**,
+**Citadel**, **Skybridge**, or **Dune Outpost**. Each is an original, fixed arena
+with its own editable/resumable save. Your normal world is not overwritten.
+Templates are embedded for offline play; these are not downloaded community maps
+or an MW2 Rust remake.
+
+[Map details, save locations and verification limits](docs/prebuilt-worlds.md).
+[Candidate status and remaining release gates](docs/prebuilt-repair-status.md).
+Quick launch: `terminal-craft --map foundry`. Gilded remains the default UI.
+
 ## Gilded UI
 
 Launch `terminal-craft` for Gilded, or press **F6** in the running game to switch
@@ -125,11 +137,17 @@ python3 scripts/install_macos.py
 python3 scripts/verify.py
 ```
 
-The verifier includes real native-window sessions for both the release and
-packaged binary in both UI modes, plus legacy and enhanced-protocol PTY sessions
-in both modes. GUI tests briefly
-capture the pointer and change fullscreen state, then release it. They create
-separate test worlds and check that normal saves remain unchanged.
+The verifier builds and tests a source snapshot with separate offline Cargo
+cache, build output and disposable saves. It never installs the app or rewrites
+the shared `target` directory. It prints the evidence directory and binds results
+to source and binary hashes. Required dependencies must already be cached.
+
+Native and installed-app tests are opt-in: after coordinating exclusive use of
+the app and desktop with their owner, run `python3 scripts/verify.py --gui`.
+GUI tests briefly capture the pointer and change fullscreen state. The verifier
+uses an exclusive QA lock and disposable saves; it does not install or restart
+the user's running app. A source-only pass does not certify the installed app.
+See [candidate status](docs/prebuilt-repair-status.md) for unresolved GUI gates.
 
 ```sh
 terminal-craft                       # native window, Gilded UI (default)
@@ -145,7 +163,11 @@ cargo run --release -- --native      # native host directly from source
 `bin/terminal-craft` builds if the release binary is missing. After source changes,
 rebuild explicitly or run the installer. The app embeds the binary and optional
 terminal configuration; it does not require the repository at runtime. The
-installer repairs CLI symlinks and backs up previous app bundles.
+installer builds into a private temporary target, points CLI aliases at the
+installed app launcher, backs up previous app bundles, and embeds a source/binary
+SHA-256 manifest. To repair aliases after moving the checkout
+without rebuilding or touching the app, run `python3 scripts/repair_cli_links.py`.
+It backs up existing symlinks and refuses to replace ordinary files.
 
 ## Saves and configuration
 

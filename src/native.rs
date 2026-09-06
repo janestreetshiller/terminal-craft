@@ -1,6 +1,9 @@
 //! Native SDL host. Simulation, saves, materials and tools stay in the shared Rust engine.
+#[path = "pack_smoke.rs"]
+mod pack_smoke;
 use crate::{
     game::Game,
+    maps,
     player::Player,
     render::{self, Frame},
     world::{World, SX, SY, SZ},
@@ -9,6 +12,7 @@ use crossterm::event::{
     Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, ModifierKeyCode, MouseButton, MouseEvent,
     MouseEventKind,
 };
+use pack_smoke::PackSmoke;
 use sdl2::{
     event::{Event as SdlEvent, WindowEvent},
     keyboard::{Keycode, Mod},
@@ -233,7 +237,25 @@ pub(crate) fn paint_map(p: &mut [u8], w: i32, h: i32, world: &World, player: &Pl
 }
 
 pub fn run(path: PathBuf, smoke_dir: Option<PathBuf>) -> io::Result<()> {
+    run_inner(path, smoke_dir, None, None)
+}
+pub fn run_map(path: PathBuf, id: &str) -> io::Result<()> {
+    let mut game = maps::open(&path, id)?;
+    game.configure_input(true, true);
+    run_inner(path, None, Some(game), None)
+}
+pub fn run_pack_test(directory: PathBuf) -> io::Result<()> {
+    run_inner(directory.join("world.tcrf"), None, None, Some(directory))
+}
+fn run_inner(
+    path: PathBuf,
+    smoke_dir: Option<PathBuf>,
+    initial: Option<Game>,
+    pack_dir: Option<PathBuf>,
+) -> io::Result<()> {
     let mut smoke = smoke_dir.map(Smoke::new).transpose()?;
+    let mut pack_smoke = pack_dir.map(PackSmoke::new).transpose()?;
+    let testing = smoke.is_some() || pack_smoke.is_some();
     let sdl = sdl2::init().map_err(err)?;
     let video = sdl.video().map_err(err)?;
     sdl2::hint::set("SDL_RENDER_SCALE_QUALITY", "0");
@@ -257,7 +279,12 @@ pub fn run(path: PathBuf, smoke_dir: Option<PathBuf>) -> io::Result<()> {
     let mouse = ReleasePointer(sdl.mouse());
     let mut pump = sdl.event_pump().map_err(err)?;
     let event_system = sdl.event().map_err(err)?;
-    let mut game: Option<Game> = None;
+    let mut game: Option<Game> = initial;
+    let mut gallery = false;
+    let map_worlds = maps::MAPS
+        .iter()
+        .map(|m| maps::preview(m.id))
+        .collect::<io::Result<Vec<_>>>()?;
     let mut selected = if path.exists() { 0 } else { 1 };
     let menu_world = World::generate(42);
     let mut menu_pixels = Vec::new();
@@ -272,7 +299,7 @@ pub fn run(path: PathBuf, smoke_dir: Option<PathBuf>) -> io::Result<()> {
     let mut quit = false;
     while !quit {
         let tick = Instant::now();
-        let dt = if smoke.is_some() {
+        let dt = if testing {
             1.0 / 60.0
         } else {
             (tick - last).as_secs_f32().min(0.05)
@@ -292,14 +319,24 @@ pub fn run(path: PathBuf, smoke_dir: Option<PathBuf>) -> io::Result<()> {
                 canvas.window_mut().set_size(1100, 720).map_err(err)?;
             }
         }
+        if let Some(s) = pack_smoke.as_mut() {
+            if index == 2 {
+                canvas.window_mut().set_size(640, 420).map_err(err)?;
+            }
+            if index == 3 {
+                canvas.window_mut().set_size(1100, 720).map_err(err)?;
+            }
+            s.inject(index, &event_system, canvas.window().id())?;
+        }
         let (w, h) = canvas.window().size();
+        let menu_count = if gallery { 6 } else { 5 };
         let w = w.max(1);
         let h = h.max(1);
         let mut activate = None;
         for e in pump.poll_iter() {
             // Deterministic QA uses tagged SDL input; real window/focus events still pass.
             // Do not log or consume unrelated physical typing as test commands. Escape aborts QA.
-            if smoke.is_some() {
+            if testing {
                 if matches!(
                     e,
                     SdlEvent::KeyDown {
@@ -416,11 +453,22 @@ pub fn run(path: PathBuf, smoke_dir: Option<PathBuf>) -> io::Result<()> {
                             }
                         } else if down && !repeat {
                             match ke.code {
-                                KeyCode::Esc | KeyCode::Char('q') => quit = true,
-                                KeyCode::Up | KeyCode::Char('w') => selected = (selected + 3) % 4,
-                                KeyCode::Down | KeyCode::Char('s') => selected = (selected + 1) % 4,
+                                KeyCode::Esc | KeyCode::Char('q') => {
+                                    if gallery {
+                                        gallery = false;
+                                        selected = 3;
+                                    } else {
+                                        quit = true;
+                                    }
+                                }
+                                KeyCode::Up | KeyCode::Char('w') => {
+                                    selected = (selected + menu_count - 1) % menu_count
+                                }
+                                KeyCode::Down | KeyCode::Char('s') => {
+                                    selected = (selected + 1) % menu_count
+                                }
                                 KeyCode::Enter => activate = Some(selected),
-                                KeyCode::Char('1'..='3') => {
+                                KeyCode::Char('1'..='6') => {
                                     if let KeyCode::Char(c) = ke.code {
                                         activate = Some(c as usize - '1' as usize);
                                     }
@@ -441,7 +489,9 @@ pub fn run(path: PathBuf, smoke_dir: Option<PathBuf>) -> io::Result<()> {
                                 selected = i;
                             }
                         }
-                    } else if let Some(i) = hit_button(&buttons(w as i32, h as i32, 4), x, y) {
+                    } else if let Some(i) =
+                        hit_button(&buttons(w as i32, h as i32, menu_count), x, y)
+                    {
                         selected = i;
                     }
                 }
@@ -479,7 +529,7 @@ pub fn run(path: PathBuf, smoke_dir: Option<PathBuf>) -> io::Result<()> {
                             }));
                         }
                     } else if down && mouse_btn == SdlButton::Left {
-                        activate = hit_button(&buttons(w as i32, h as i32, 4), x, y);
+                        activate = hit_button(&buttons(w as i32, h as i32, menu_count), x, y);
                     }
                 }
                 SdlEvent::MouseWheel { y, .. } => {
@@ -516,19 +566,31 @@ pub fn run(path: PathBuf, smoke_dir: Option<PathBuf>) -> io::Result<()> {
                     _ => {}
                 }
             } else {
-                match a {
-                    0 if path.exists() => {
-                        game = Some(Game::load(&path)?);
+                if gallery {
+                    if let Some(map) = maps::MAPS.get(a) {
+                        game = Some(maps::open(&path, map.id)?);
                     }
-                    1 | 2 => {
-                        let seed = SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .unwrap_or_default()
-                            .as_millis() as u32;
-                        game = Some(Game::new_map(seed, a == 2, path.clone()));
+                    gallery = false;
+                    selected = 3;
+                } else {
+                    match a {
+                        0 if path.exists() => {
+                            game = Some(Game::load(&path)?);
+                        }
+                        1 | 2 => {
+                            let seed = SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_millis() as u32;
+                            game = Some(Game::new_map(seed, a == 2, path.clone()));
+                        }
+                        3 => {
+                            gallery = true;
+                            selected = 0;
+                        }
+                        4 => quit = true,
+                        _ => {}
                     }
-                    3 => quit = true,
-                    _ => {}
                 }
                 if let Some(g) = game.as_mut() {
                     g.configure_input(true, true);
@@ -582,12 +644,20 @@ pub fn run(path: PathBuf, smoke_dir: Option<PathBuf>) -> io::Result<()> {
                 &mut menu_pixels,
                 w as i32,
                 h as i32,
-                &menu_world,
+                if gallery {
+                    &map_worlds[selected.min(4)]
+                } else {
+                    &menu_world
+                },
+                if gallery { 4.5 } else { 48.5 },
+                if gallery { 32.0 } else { 29.0 },
                 48.5,
-                29.0,
-                48.5,
-                start.elapsed().as_secs_f32() * 0.03,
-                -0.30,
+                if gallery {
+                    0.0
+                } else {
+                    start.elapsed().as_secs_f32() * 0.03
+                },
+                if gallery { -0.4 } else { -0.30 },
                 false,
                 0.0,
             );
@@ -595,8 +665,26 @@ pub fn run(path: PathBuf, smoke_dir: Option<PathBuf>) -> io::Result<()> {
                 &mut menu_pixels,
                 w as i32,
                 h as i32,
-                "TERMINAL CRAFT",
-                &["CONTINUE", "NEW SURVIVAL", "NEW CREATIVE", "QUIT"],
+                if gallery {
+                    "PREBUILT WORLDS"
+                } else {
+                    "TERMINAL CRAFT"
+                },
+                &if gallery {
+                    maps::MAPS
+                        .iter()
+                        .map(|m| m.title)
+                        .chain(std::iter::once("BACK"))
+                        .collect::<Vec<_>>()
+                } else {
+                    vec![
+                        "CONTINUE",
+                        "NEW SURVIVAL",
+                        "NEW CREATIVE",
+                        "PREBUILT WORLDS",
+                        "QUIT",
+                    ]
+                },
                 selected,
                 path.exists(),
             );
@@ -638,6 +726,17 @@ pub fn run(path: PathBuf, smoke_dir: Option<PathBuf>) -> io::Result<()> {
                 tick.elapsed(),
             )?;
         }
+        if let Some(s) = pack_smoke.as_mut() {
+            s.observe(
+                index,
+                game.as_ref(),
+                &path,
+                rgba,
+                w,
+                h,
+                mouse.0.relative_mouse_mode(),
+            )?;
+        }
         frames += 1;
         if fps_time.elapsed() >= Duration::from_secs(1) {
             fps = frames;
@@ -655,6 +754,9 @@ pub fn run(path: PathBuf, smoke_dir: Option<PathBuf>) -> io::Result<()> {
     }
     mouse.0.set_relative_mouse_mode(false);
     mouse.0.show_cursor(true);
+    if let Some(s) = pack_smoke {
+        s.finish(!mouse.0.relative_mouse_mode())?;
+    }
     if let Some(s) = smoke {
         s.finish(&path, !mouse.0.relative_mouse_mode(), index)?;
     }
@@ -777,7 +879,7 @@ impl Smoke {
         };
         match n {
             6 => {
-                let r = buttons(1100, 720, 4)[0];
+                let r = buttons(1100, 720, 5)[0];
                 click(r.x + r.w / 2, r.y + r.h / 2)?;
             }
             65 => {
@@ -1006,10 +1108,12 @@ mod tests {
     #[test]
     fn native_buttons_remain_clickable_at_all_window_sizes() {
         for (w, h) in [(640, 420), (1100, 720), (1800, 1100)] {
-            let r = buttons(w, h, 4);
-            for (i, b) in r.iter().enumerate() {
-                assert!(b.x >= 0 && b.y >= 0 && b.x + b.w <= w && b.y + b.h <= h);
-                assert_eq!(hit_button(&r, b.x + b.w / 2, b.y + b.h / 2), Some(i));
+            for count in [3, 5, 6] {
+                let r = buttons(w, h, count);
+                for (i, b) in r.iter().enumerate() {
+                    assert!(b.x >= 0 && b.y >= 0 && b.x + b.w <= w && b.y + b.h <= h);
+                    assert_eq!(hit_button(&r, b.x + b.w / 2, b.y + b.h / 2), Some(i));
+                }
             }
         }
     }

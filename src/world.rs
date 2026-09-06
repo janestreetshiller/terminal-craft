@@ -257,6 +257,10 @@ impl World {
 
     pub fn load(path: &Path) -> io::Result<LoadedWorld> {
         let mut f = fs::File::open(path)?;
+        Self::read(&mut f)
+    }
+
+    pub(crate) fn read(f: &mut impl Read) -> io::Result<LoadedWorld> {
         let mut mag = [0u8; 4];
         f.read_exact(&mut mag)?;
         if &mag != b"TCRF" {

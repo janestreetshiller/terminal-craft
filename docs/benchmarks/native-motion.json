@@ -1,5 +1,6 @@
 {
   "version": "0.9.0",
+  "redaction_note": "Absolute user/workspace prefixes were replaced with relative paths or $HOME in September 2026. Historical test results and hashes are unchanged; log paths identify original local artifacts, not current release evidence.",
   "hardware": "Apple M4",
   "verification": {
     "timestamp": "2026-09-05T02:18:31.584253+00:00",
@@ -11,7 +12,7 @@
           "--check"
         ],
         "exit_code": 0,
-        "log": "/Users/main/Metal/terminal-craft/target/verification/1.log"
+        "log": "target/verification/1.log"
       },
       {
         "command": [
@@ -24,7 +25,7 @@
           "warnings"
         ],
         "exit_code": 0,
-        "log": "/Users/main/Metal/terminal-craft/target/verification/2.log"
+        "log": "target/verification/2.log"
       },
       {
         "command": [
@@ -33,7 +34,7 @@
           "--locked"
         ],
         "exit_code": 0,
-        "log": "/Users/main/Metal/terminal-craft/target/verification/3.log",
+        "log": "target/verification/3.log",
         "rust_tests_passed": 40
       },
       {
@@ -44,7 +45,7 @@
           "--locked"
         ],
         "exit_code": 0,
-        "log": "/Users/main/Metal/terminal-craft/target/verification/4.log"
+        "log": "target/verification/4.log"
       },
       {
         "command": [
@@ -57,7 +58,7 @@
           "-v"
         ],
         "exit_code": 0,
-        "log": "/Users/main/Metal/terminal-craft/target/verification/5.log",
+        "log": "target/verification/5.log",
         "python_tests_passed": 6
       },
       {
@@ -67,7 +68,7 @@
           "--check"
         ],
         "exit_code": 0,
-        "log": "/Users/main/Metal/terminal-craft/target/verification/6.log"
+        "log": "target/verification/6.log"
       }
     ],
     "passed": true,
@@ -116,12 +117,12 @@
     "native_frame_median_ms": 7.5268749999999995
   },
   "save_preservation": {
-    "/Users/main/.local/share/terminal-craft/world.tcrf": {
+    "$HOME/.local/share/terminal-craft/world.tcrf": {
       "matches_early_session_hash": false,
       "modified_after_verified_tests": true,
       "current_sha256": "a0e80f262cc28948474cf3b4acf7e4d677cd9e433620505896211f176fa581d8"
     },
-    "/Users/main/.local/share/tuicraft/world.tcrf": {
+    "$HOME/.local/share/tuicraft/world.tcrf": {
       "matches_early_session_hash": true,
       "modified_after_verified_tests": false,
       "current_sha256": "5293afd686dff655600e8f9990207adde33d39336f391331dc50d8e8b3e05ec2"
