@@ -10,6 +10,7 @@ else
   GAME="$ROOT/target/release/terminal-craft"
   CONF="$ROOT/kitty-minigame.conf"
   if [[ ! -x "$GAME" ]]; then
+    export CMAKE_POLICY_VERSION_MINIMUM="${CMAKE_POLICY_VERSION_MINIMUM:-3.5}"
     cargo build --release --locked --manifest-path "$ROOT/Cargo.toml"
   fi
 fi

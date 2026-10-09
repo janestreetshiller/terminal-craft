@@ -63,6 +63,13 @@ class SourceContractTests(unittest.TestCase):
                 self.assertEqual(lock.read_bytes(), before)
             self.assertFalse(lock.exists())
 
+    def test_launcher_exports_cmake_policy_before_manifest_path_build(self):
+        launcher = (ROOT / 'bin/terminal-craft').read_text()
+        policy = 'export CMAKE_POLICY_VERSION_MINIMUM="${CMAKE_POLICY_VERSION_MINIMUM:-3.5}"'
+        build = 'cargo build --release --locked --manifest-path "$ROOT/Cargo.toml"'
+        self.assertIn(policy, launcher)
+        self.assertLess(launcher.index(policy), launcher.index(build))
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
